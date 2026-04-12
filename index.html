@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoQuest · World Geography</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ocean:       #0d1b2a;
+      --ocean-mid:   #1e3a5f;
+      --land:        #c5b896;
+      --land-hover:  #d4c8a8;
+      --highlight:   #f4a261;
+      --highlight2:  #e76f51;
+      --correct:     #52b788;
+      --wrong:       #e63946;
+      --panel:       #0f2236;
+      --border:      #1e3a5f;
+      --text:        #e8e2d5;
+      --text-dim:    #7a9bb5;
+      --btn-bg:      #1a3550;
+      --btn-hover:   #234668;
+      --accent:      #4a9eda;
+      --gold:        #f4c430;
+      --states-land: #b8cce4;
+      --states-bg:   #0d1b2a;
+    }
+
+    html, body { width: 100%; height: 100%; background: var(--ocean); font-family: 'Inter', sans-serif; color: var(--text); overflow: hidden; }
+
+    #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+    /* ── Header ── */
+    #header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; height: 56px;
+      background: var(--panel); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; z-index: 10; gap: 16px;
+    }
+
+    .logo {
+      font-family: 'Playfair Display', serif; font-size: 20px;
+      letter-spacing: 0.04em; color: var(--text);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 28px; height: 28px; background: var(--highlight);
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 15px;
+    }
+
+    /* ── Mode Toggle ── */
+    #mode-toggle {
+      display: flex; gap: 4px;
+      background: var(--ocean); border-radius: 8px; padding: 3px;
+      border: 1px solid var(--border);
+    }
+
+    .mode-btn {
+      padding: 5px 14px; background: transparent;
+      border: none; border-radius: 6px;
+      color: var(--text-dim); font-size: 13px; font-weight: 500;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      transition: all 0.18s; white-space: nowrap;
+    }
+
+    .mode-btn:hover { color: var(--text); }
+    .mode-btn.active { background: var(--btn-hover); color: var(--text); }
+
+    /* ── Stats ── */
+    #stats { display: flex; gap: 24px; flex-shrink: 0; }
+
+    .stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+    .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); font-weight: 500; }
+    .stat-value { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; }
+
+    /* ── Progress Bar ── */
+    #progress-bar-wrap { height: 3px; background: var(--border); flex-shrink: 0; }
+    #progress-bar { height: 100%; background: linear-gradient(90deg, var(--highlight), var(--highlight2)); width: 0%; transition: width 0.4s ease; }
+
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Map ── */
+    #map-container { flex: 1; position: relative; overflow: hidden; background: var(--ocean); }
+    #world-map { width: 100%; height: 100%; display: block; }
+
+    .country { fill: var(--land); cursor: default; transition: fill 0.25s ease; }
+
+    /* US states default color — must come BEFORE highlighted/correct/wrong so those win */
+    .mode-states .country { fill: var(--states-land); }
+
+    /* These come after so they beat the default and the states override above */
+    .country.highlighted { fill: var(--highlight) !important; filter: url(#glow); }
+    .country.correct { fill: var(--correct) !important; filter: none; }
+    .country.wrong   { fill: var(--wrong)   !important; filter: none; }
+
+    .borders { fill: none; stroke: var(--ocean); stroke-width: 0.6px; pointer-events: none; }
+    .borders-us { fill: none; stroke: var(--ocean); stroke-width: 0.8px; pointer-events: none; }
+    .nation-outline { fill: none; stroke: var(--ocean-mid); stroke-width: 1px; pointer-events: none; opacity: 0.6; }
+    .graticule { fill: none; stroke: var(--ocean-mid); stroke-width: 0.3px; opacity: 0.5; }
+
+    #map-controls { position: absolute; bottom: 20px; left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+    .map-btn {
+      width: 36px; height: 36px; background: var(--panel);
+      border: 1px solid var(--border); color: var(--text);
+      font-size: 18px; font-weight: 300; cursor: pointer;
+      border-radius: 6px; display: flex; align-items: center;
+      justify-content: center; transition: background 0.15s; line-height: 1;
+    }
+    .map-btn:hover { background: var(--btn-hover); }
+
+    /* ── Game Panel ── */
+    #game-panel {
+      width: 320px; flex-shrink: 0;
+      background: var(--panel); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 24px 20px; gap: 20px; overflow-y: auto;
+    }
+
+    #question-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 8px; }
+    #question-text { font-size: 17px; font-weight: 600; line-height: 1.4; color: var(--text); }
+    #region-hint { margin-top: 6px; font-size: 12px; color: var(--text-dim); height: 16px; }
+
+    #answers { display: flex; flex-direction: column; gap: 10px; }
+
+    .answer-btn {
+      padding: 13px 16px; background: var(--btn-bg);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      color: var(--text); font-size: 14px; font-weight: 500;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      text-align: left; transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      display: flex; align-items: center; gap: 10px;
+      position: relative; overflow: hidden;
+    }
+    .answer-btn:hover:not(:disabled) { background: var(--btn-hover); border-color: var(--accent); transform: translateX(2px); }
+    .answer-btn:disabled { cursor: default; }
+
+    .answer-btn .letter {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: var(--ocean-mid); font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: var(--text-dim); letter-spacing: 0;
+    }
+
+    .answer-btn.correct-answer { background: rgba(82,183,136,0.2); border-color: var(--correct); color: var(--correct); }
+    .answer-btn.correct-answer .letter { background: var(--correct); color: #fff; }
+    .answer-btn.wrong-answer { background: rgba(230,57,70,0.15); border-color: var(--wrong); color: var(--wrong); }
+    .answer-btn.wrong-answer .letter { background: var(--wrong); color: #fff; }
+
+    .diff-badge {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; padding: 2px 6px; border-radius: 4px;
+      opacity: 0; pointer-events: none;
+    }
+    .answer-btn.correct-answer .diff-badge,
+    .answer-btn.wrong-answer .diff-badge { opacity: 1; }
+
+    .diff-neighbor  { background: rgba(230,57,70,0.3);   color: #ff8a8f; }
+    .diff-region    { background: rgba(244,162,97,0.3);  color: var(--highlight); }
+    .diff-continent { background: rgba(74,158,218,0.3);  color: var(--accent); }
+    .diff-global    { background: rgba(122,155,181,0.2); color: var(--text-dim); }
+
+    /* ── Feedback ── */
+    #feedback {
+      min-height: 52px; border-radius: 10px; padding: 12px 14px;
+      font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #feedback.visible { opacity: 1; }
+    #feedback.correct-fb { background: rgba(82,183,136,0.15); border: 1px solid rgba(82,183,136,0.4); color: var(--correct); }
+    #feedback.wrong-fb   { background: rgba(230,57,70,0.12);  border: 1px solid rgba(230,57,70,0.35);  color: #ff8a8f; }
+    #feedback .fb-icon { font-size: 18px; }
+
+    /* ── Score Screen ── */
+    #score-screen {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; gap: 14px; padding: 24px;
+    }
+    #score-screen.visible { display: flex; }
+
+    .score-globe { font-size: 52px; line-height: 1; }
+    .score-title { font-family: 'Playfair Display', serif; font-size: 20px; }
+    .score-big { font-size: 52px; font-weight: 700; color: var(--highlight); line-height: 1; }
+    .score-grade { font-size: 14px; font-weight: 600; color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase; }
+    .score-accuracy { font-size: 13px; color: var(--text-dim); }
+
+    #play-again {
+      margin-top: 8px; padding: 13px 32px;
+      background: var(--highlight); border: none; border-radius: 10px;
+      color: var(--ocean); font-size: 15px; font-weight: 700;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      letter-spacing: 0.02em; transition: background 0.2s, transform 0.1s;
+    }
+    #play-again:hover { background: var(--highlight2); transform: translateY(-1px); }
+
+    /* ── Loading ── */
+    #loading {
+      position: absolute; inset: 0; background: var(--ocean);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; z-index: 100;
+    }
+    .spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--highlight); border-radius: 50%; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--text-dim); }
+
+    @media (max-width: 768px) {
+      #main { flex-direction: column; }
+      #game-panel { width: 100%; flex-shrink: 0; height: auto; max-height: 50vh; border-left: none; border-top: 1px solid var(--border); }
+      #stats { gap: 16px; }
+      .stat-value { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="logo">
+      <div class="logo-icon">🌍</div>
+      GeoQuest
+    </div>
+    <div id="mode-toggle">
+      <button class="mode-btn active" data-mode="world">🌍 World</button>
+      <button class="mode-btn" data-mode="states">🗺 US States</button>
+    </div>
+    <div id="stats">
+      <div class="stat">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="score-display">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Question</span>
+        <span class="stat-value" id="q-counter">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Streak</span>
+        <span class="stat-value" id="streak-display">0</span>
+      </div>
+    </div>
+  </div>
+  <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+  <div id="main">
+    <div id="map-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading map…</div>
+      </div>
+      <svg id="world-map"></svg>
+      <div id="map-controls">
+        <button class="map-btn" id="zoom-in"    title="Zoom in">+</button>
+        <button class="map-btn" id="zoom-out"   title="Zoom out">−</button>
+        <button class="map-btn" id="zoom-reset" title="Reset view">⌂</button>
+      </div>
+    </div>
+    <div id="game-panel">
+      <div id="question-section">
+        <div id="question-tag">Identify the region</div>
+        <div id="question-text">Loading…</div>
+        <div id="region-hint"></div>
+      </div>
+      <div id="answers"></div>
+      <div id="feedback"></div>
+      <div id="score-screen">
+        <div class="score-globe" id="score-emoji">🌍</div>
+        <div class="score-title">Round Complete</div>
+        <div class="score-big" id="final-score-num">0/15</div>
+        <div class="score-grade" id="final-grade"></div>
+        <div class="score-accuracy" id="final-accuracy"></div>
+        <button id="play-again">Play Again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  WORLD COUNTRIES DATABASE  (ISO 3166-1 numeric → metadata)
+//  continent = broad division, region = sub-region
+// ═══════════════════════════════════════════════════════════════
+const COUNTRIES = {
+  12:  { name: "Algeria",               continent: "Africa",        region: "Northern Africa" },
+  24:  { name: "Angola",                continent: "Africa",        region: "Central Africa" },
+  204: { name: "Benin",                 continent: "Africa",        region: "Western Africa" },
+  72:  { name: "Botswana",              continent: "Africa",        region: "Southern Africa" },
+  854: { name: "Burkina Faso",          continent: "Africa",        region: "Western Africa" },
+  108: { name: "Burundi",               continent: "Africa",        region: "Eastern Africa" },
+  120: { name: "Cameroon",              continent: "Africa",        region: "Central Africa" },
+  140: { name: "Central African Rep.",  continent: "Africa",        region: "Central Africa" },
+  148: { name: "Chad",                  continent: "Africa",        region: "Central Africa" },
+  178: { name: "Congo",                 continent: "Africa",        region: "Central Africa" },
+  180: { name: "DR Congo",              continent: "Africa",        region: "Central Africa" },
+  262: { name: "Djibouti",              continent: "Africa",        region: "Eastern Africa" },
+  818: { name: "Egypt",                 continent: "Africa",        region: "Northern Africa" },
+  226: { name: "Equatorial Guinea",     continent: "Africa",        region: "Central Africa" },
+  232: { name: "Eritrea",               continent: "Africa",        region: "Eastern Africa" },
+  231: { name: "Ethiopia",              continent: "Africa",        region: "Eastern Africa" },
+  266: { name: "Gabon",                 continent: "Africa",        region: "Central Africa" },
+  270: { name: "Gambia",                continent: "Africa",        region: "Western Africa" },
+  288: { name: "Ghana",                 continent: "Africa",        region: "Western Africa" },
+  324: { name: "Guinea",                continent: "Africa",        region: "Western Africa" },
+  624: { name: "Guinea-Bissau",         continent: "Africa",        region: "Western Africa" },
+  384: { name: "Côte d'Ivoire",         continent: "Africa",        region: "Western Africa" },
+  404: { name: "Kenya",                 continent: "Africa",        region: "Eastern Africa" },
+  426: { name: "Lesotho",               continent: "Africa",        region: "Southern Africa" },
+  430: { name: "Liberia",               continent: "Africa",        region: "Western Africa" },
+  434: { name: "Libya",                 continent: "Africa",        region: "Northern Africa" },
+  450: { name: "Madagascar",            continent: "Africa",        region: "Eastern Africa" },
+  454: { name: "Malawi",                continent: "Africa",        region: "Eastern Africa" },
+  466: { name: "Mali",                  continent: "Africa",        region: "Western Africa" },
+  478: { name: "Mauritania",            continent: "Africa",        region: "Western Africa" },
+  504: { name: "Morocco",               continent: "Africa",        region: "Northern Africa" },
+  508: { name: "Mozambique",            continent: "Africa",        region: "Eastern Africa" },
+  516: { name: "Namibia",               continent: "Africa",        region: "Southern Africa" },
+  562: { name: "Niger",                 continent: "Africa",        region: "Western Africa" },
+  566: { name: "Nigeria",               continent: "Africa",        region: "Western Africa" },
+  646: { name: "Rwanda",                continent: "Africa",        region: "Eastern Africa" },
+  686: { name: "Senegal",               continent: "Africa",        region: "Western Africa" },
+  694: { name: "Sierra Leone",          continent: "Africa",        region: "Western Africa" },
+  706: { name: "Somalia",               continent: "Africa",        region: "Eastern Africa" },
+  710: { name: "South Africa",          continent: "Africa",        region: "Southern Africa" },
+  728: { name: "South Sudan",           continent: "Africa",        region: "Eastern Africa" },
+  729: { name: "Sudan",                 continent: "Africa",        region: "Northern Africa" },
+  748: { name: "Eswatini",              continent: "Africa",        region: "Southern Africa" },
+  834: { name: "Tanzania",              continent: "Africa",        region: "Eastern Africa" },
+  768: { name: "Togo",                  continent: "Africa",        region: "Western Africa" },
+  788: { name: "Tunisia",               continent: "Africa",        region: "Northern Africa" },
+  800: { name: "Uganda",                continent: "Africa",        region: "Eastern Africa" },
+  732: { name: "Western Sahara",        continent: "Africa",        region: "Northern Africa" },
+  894: { name: "Zambia",                continent: "Africa",        region: "Eastern Africa" },
+  716: { name: "Zimbabwe",              continent: "Africa",        region: "Eastern Africa" },
+  4:   { name: "Afghanistan",           continent: "Asia",          region: "South Asia" },
+  51:  { name: "Armenia",               continent: "Asia",          region: "Western Asia" },
+  31:  { name: "Azerbaijan",            continent: "Asia",          region: "Western Asia" },
+  50:  { name: "Bangladesh",            continent: "Asia",          region: "South Asia" },
+  64:  { name: "Bhutan",                continent: "Asia",          region: "South Asia" },
+  96:  { name: "Brunei",                continent: "Asia",          region: "Southeast Asia" },
+  116: { name: "Cambodia",              continent: "Asia",          region: "Southeast Asia" },
+  156: { name: "China",                 continent: "Asia",          region: "East Asia" },
+  196: { name: "Cyprus",                continent: "Asia",          region: "Western Asia" },
+  268: { name: "Georgia",               continent: "Asia",          region: "Western Asia" },
+  356: { name: "India",                 continent: "Asia",          region: "South Asia" },
+  360: { name: "Indonesia",             continent: "Asia",          region: "Southeast Asia" },
+  364: { name: "Iran",                  continent: "Asia",          region: "South Asia" },
+  368: { name: "Iraq",                  continent: "Asia",          region: "Western Asia" },
+  376: { name: "Israel",                continent: "Asia",          region: "Western Asia" },
+  392: { name: "Japan",                 continent: "Asia",          region: "East Asia" },
+  400: { name: "Jordan",                continent: "Asia",          region: "Western Asia" },
+  398: { name: "Kazakhstan",            continent: "Asia",          region: "Central Asia" },
+  408: { name: "North Korea",           continent: "Asia",          region: "East Asia" },
+  410: { name: "South Korea",           continent: "Asia",          region: "East Asia" },
+  414: { name: "Kuwait",                continent: "Asia",          region: "Western Asia" },
+  417: { name: "Kyrgyzstan",            continent: "Asia",          region: "Central Asia" },
+  418: { name: "Laos",                  continent: "Asia",          region: "Southeast Asia" },
+  422: { name: "Lebanon",               continent: "Asia",          region: "Western Asia" },
+  458: { name: "Malaysia",              continent: "Asia",          region: "Southeast Asia" },
+  496: { name: "Mongolia",              continent: "Asia",          region: "East Asia" },
+  104: { name: "Myanmar",               continent: "Asia",          region: "Southeast Asia" },
+  524: { name: "Nepal",                 continent: "Asia",          region: "South Asia" },
+  512: { name: "Oman",                  continent: "Asia",          region: "Western Asia" },
+  586: { name: "Pakistan",              continent: "Asia",          region: "South Asia" },
+  275: { name: "Palestine",             continent: "Asia",          region: "Western Asia" },
+  608: { name: "Philippines",           continent: "Asia",          region: "Southeast Asia" },
+  634: { name: "Qatar",                 continent: "Asia",          region: "Western Asia" },
+  682: { name: "Saudi Arabia",          continent: "Asia",          region: "Western Asia" },
+  144: { name: "Sri Lanka",             continent: "Asia",          region: "South Asia" },
+  760: { name: "Syria",                 continent: "Asia",          region: "Western Asia" },
+  158: { name: "Taiwan",                continent: "Asia",          region: "East Asia" },
+  762: { name: "Tajikistan",            continent: "Asia",          region: "Central Asia" },
+  764: { name: "Thailand",              continent: "Asia",          region: "Southeast Asia" },
+  626: { name: "Timor-Leste",           continent: "Asia",          region: "Southeast Asia" },
+  792: { name: "Turkey",                continent: "Asia",          region: "Western Asia" },
+  795: { name: "Turkmenistan",          continent: "Asia",          region: "Central Asia" },
+  784: { name: "United Arab Emirates",  continent: "Asia",          region: "Western Asia" },
+  860: { name: "Uzbekistan",            continent: "Asia",          region: "Central Asia" },
+  704: { name: "Vietnam",               continent: "Asia",          region: "Southeast Asia" },
+  887: { name: "Yemen",                 continent: "Asia",          region: "Western Asia" },
+  8:   { name: "Albania",               continent: "Europe",        region: "Southern Europe" },
+  40:  { name: "Austria",               continent: "Europe",        region: "Western Europe" },
+  112: { name: "Belarus",               continent: "Europe",        region: "Eastern Europe" },
+  56:  { name: "Belgium",               continent: "Europe",        region: "Western Europe" },
+  70:  { name: "Bosnia and Herzegovina",continent: "Europe",        region: "Southern Europe" },
+  100: { name: "Bulgaria",              continent: "Europe",        region: "Eastern Europe" },
+  191: { name: "Croatia",               continent: "Europe",        region: "Southern Europe" },
+  203: { name: "Czech Republic",        continent: "Europe",        region: "Eastern Europe" },
+  208: { name: "Denmark",               continent: "Europe",        region: "Northern Europe" },
+  233: { name: "Estonia",               continent: "Europe",        region: "Northern Europe" },
+  246: { name: "Finland",               continent: "Europe",        region: "Northern Europe" },
+  250: { name: "France",                continent: "Europe",        region: "Western Europe" },
+  276: { name: "Germany",               continent: "Europe",        region: "Western Europe" },
+  300: { name: "Greece",                continent: "Europe",        region: "Southern Europe" },
+  348: { name: "Hungary",               continent: "Europe",        region: "Eastern Europe" },
+  352: { name: "Iceland",               continent: "Europe",        region: "Northern Europe" },
+  372: { name: "Ireland",               continent: "Europe",        region: "Northern Europe" },
+  380: { name: "Italy",                 continent: "Europe",        region: "Southern Europe" },
+  383: { name: "Kosovo",                continent: "Europe",        region: "Southern Europe" },
+  428: { name: "Latvia",                continent: "Europe",        region: "Northern Europe" },
+  440: { name: "Lithuania",             continent: "Europe",        region: "Northern Europe" },
+  442: { name: "Luxembourg",            continent: "Europe",        region: "Western Europe" },
+  498: { name: "Moldova",               continent: "Europe",        region: "Eastern Europe" },
+  499: { name: "Montenegro",            continent: "Europe",        region: "Southern Europe" },
+  528: { name: "Netherlands",           continent: "Europe",        region: "Western Europe" },
+  807: { name: "North Macedonia",       continent: "Europe",        region: "Southern Europe" },
+  578: { name: "Norway",                continent: "Europe",        region: "Northern Europe" },
+  616: { name: "Poland",                continent: "Europe",        region: "Eastern Europe" },
+  620: { name: "Portugal",              continent: "Europe",        region: "Southern Europe" },
+  642: { name: "Romania",               continent: "Europe",        region: "Eastern Europe" },
+  643: { name: "Russia",                continent: "Europe",        region: "Eastern Europe" },
+  688: { name: "Serbia",                continent: "Europe",        region: "Southern Europe" },
+  703: { name: "Slovakia",              continent: "Europe",        region: "Eastern Europe" },
+  705: { name: "Slovenia",              continent: "Europe",        region: "Southern Europe" },
+  724: { name: "Spain",                 continent: "Europe",        region: "Southern Europe" },
+  752: { name: "Sweden",                continent: "Europe",        region: "Northern Europe" },
+  756: { name: "Switzerland",           continent: "Europe",        region: "Western Europe" },
+  804: { name: "Ukraine",               continent: "Europe",        region: "Eastern Europe" },
+  826: { name: "United Kingdom",        continent: "Europe",        region: "Northern Europe" },
+  32:  { name: "Argentina",             continent: "South America", region: "South America" },
+  84:  { name: "Belize",                continent: "North America", region: "Central America" },
+  68:  { name: "Bolivia",               continent: "South America", region: "South America" },
+  76:  { name: "Brazil",                continent: "South America", region: "South America" },
+  124: { name: "Canada",                continent: "North America", region: "Northern America" },
+  152: { name: "Chile",                 continent: "South America", region: "South America" },
+  170: { name: "Colombia",              continent: "South America", region: "South America" },
+  188: { name: "Costa Rica",            continent: "North America", region: "Central America" },
+  192: { name: "Cuba",                  continent: "North America", region: "Caribbean" },
+  214: { name: "Dominican Republic",    continent: "North America", region: "Caribbean" },
+  218: { name: "Ecuador",               continent: "South America", region: "South America" },
+  222: { name: "El Salvador",           continent: "North America", region: "Central America" },
+  320: { name: "Guatemala",             continent: "North America", region: "Central America" },
+  328: { name: "Guyana",                continent: "South America", region: "South America" },
+  332: { name: "Haiti",                 continent: "North America", region: "Caribbean" },
+  340: { name: "Honduras",              continent: "North America", region: "Central America" },
+  388: { name: "Jamaica",               continent: "North America", region: "Caribbean" },
+  484: { name: "Mexico",                continent: "North America", region: "Northern America" },
+  558: { name: "Nicaragua",             continent: "North America", region: "Central America" },
+  591: { name: "Panama",                continent: "North America", region: "Central America" },
+  600: { name: "Paraguay",              continent: "South America", region: "South America" },
+  604: { name: "Peru",                  continent: "South America", region: "South America" },
+  740: { name: "Suriname",              continent: "South America", region: "South America" },
+  780: { name: "Trinidad and Tobago",   continent: "North America", region: "Caribbean" },
+  840: { name: "United States",         continent: "North America", region: "Northern America" },
+  858: { name: "Uruguay",               continent: "South America", region: "South America" },
+  862: { name: "Venezuela",             continent: "South America", region: "South America" },
+  36:  { name: "Australia",             continent: "Oceania",       region: "Oceania" },
+  242: { name: "Fiji",                  continent: "Oceania",       region: "Oceania" },
+  554: { name: "New Zealand",           continent: "Oceania",       region: "Oceania" },
+  598: { name: "Papua New Guinea",      continent: "Oceania",       region: "Oceania" },
+  90:  { name: "Solomon Islands",       continent: "Oceania",       region: "Oceania" },
+  548: { name: "Vanuatu",               continent: "Oceania",       region: "Oceania" },
+};
+
+const WORLD_SKIP = new Set([10, 304, 238, 732, 275, 158, 626]);
+
+// ═══════════════════════════════════════════════════════════════
+//  US STATES DATABASE  (FIPS numeric → metadata)
+//  continent = broad area, region = census division
+// ═══════════════════════════════════════════════════════════════
+const STATES = {
+  1:  { name: "Alabama",        continent: "South",     region: "East South Central" },
+  2:  { name: "Alaska",         continent: "West",      region: "Pacific" },
+  4:  { name: "Arizona",        continent: "West",      region: "Mountain" },
+  5:  { name: "Arkansas",       continent: "South",     region: "West South Central" },
+  6:  { name: "California",     continent: "West",      region: "Pacific" },
+  8:  { name: "Colorado",       continent: "West",      region: "Mountain" },
+  9:  { name: "Connecticut",    continent: "Northeast", region: "New England" },
+  10: { name: "Delaware",       continent: "Northeast", region: "Mid-Atlantic" },
+  12: { name: "Florida",        continent: "South",     region: "South Atlantic" },
+  13: { name: "Georgia",        continent: "South",     region: "South Atlantic" },
+  15: { name: "Hawaii",         continent: "West",      region: "Pacific" },
+  16: { name: "Idaho",          continent: "West",      region: "Mountain" },
+  17: { name: "Illinois",       continent: "Midwest",   region: "East North Central" },
+  18: { name: "Indiana",        continent: "Midwest",   region: "East North Central" },
+  19: { name: "Iowa",           continent: "Midwest",   region: "West North Central" },
+  20: { name: "Kansas",         continent: "Midwest",   region: "West North Central" },
+  21: { name: "Kentucky",       continent: "South",     region: "East South Central" },
+  22: { name: "Louisiana",      continent: "South",     region: "West South Central" },
+  23: { name: "Maine",          continent: "Northeast", region: "New England" },
+  24: { name: "Maryland",       continent: "South",     region: "South Atlantic" },
+  25: { name: "Massachusetts",  continent: "Northeast", region: "New England" },
+  26: { name: "Michigan",       continent: "Midwest",   region: "East North Central" },
+  27: { name: "Minnesota",      continent: "Midwest",   region: "West North Central" },
+  28: { name: "Mississippi",    continent: "South",     region: "East South Central" },
+  29: { name: "Missouri",       continent: "Midwest",   region: "West North Central" },
+  30: { name: "Montana",        continent: "West",      region: "Mountain" },
+  31: { name: "Nebraska",       continent: "Midwest",   region: "West North Central" },
+  32: { name: "Nevada",         continent: "West",      region: "Mountain" },
+  33: { name: "New Hampshire",  continent: "Northeast", region: "New England" },
+  34: { name: "New Jersey",     continent: "Northeast", region: "Mid-Atlantic" },
+  35: { name: "New Mexico",     continent: "West",      region: "Mountain" },
+  36: { name: "New York",       continent: "Northeast", region: "Mid-Atlantic" },
+  37: { name: "North Carolina", continent: "South",     region: "South Atlantic" },
+  38: { name: "North Dakota",   continent: "Midwest",   region: "West North Central" },
+  39: { name: "Ohio",           continent: "Midwest",   region: "East North Central" },
+  40: { name: "Oklahoma",       continent: "South",     region: "West South Central" },
+  41: { name: "Oregon",         continent: "West",      region: "Pacific" },
+  42: { name: "Pennsylvania",   continent: "Northeast", region: "Mid-Atlantic" },
+  44: { name: "Rhode Island",   continent: "Northeast", region: "New England" },
+  45: { name: "South Carolina", continent: "South",     region: "South Atlantic" },
+  46: { name: "South Dakota",   continent: "Midwest",   region: "West North Central" },
+  47: { name: "Tennessee",      continent: "South",     region: "East South Central" },
+  48: { name: "Texas",          continent: "South",     region: "West South Central" },
+  49: { name: "Utah",           continent: "West",      region: "Mountain" },
+  50: { name: "Vermont",        continent: "Northeast", region: "New England" },
+  51: { name: "Virginia",       continent: "South",     region: "South Atlantic" },
+  53: { name: "Washington",     continent: "West",      region: "Pacific" },
+  54: { name: "West Virginia",  continent: "South",     region: "South Atlantic" },
+  55: { name: "Wisconsin",      continent: "Midwest",   region: "East North Central" },
+  56: { name: "Wyoming",        continent: "West",      region: "Mountain" },
+};
+
+const STATES_SKIP = new Set([11, 72, 78]); // DC, Puerto Rico, Virgin Islands
+
+// ═══════════════════════════════════════════════════════════════
+//  MODE CONFIG
+// ═══════════════════════════════════════════════════════════════
+const MODES = {
+  world: {
+    label: 'world',
+    db: COUNTRIES,
+    skip: WORLD_SKIP,
+    url: 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
+    objName: 'countries',
+    questionTag: 'Identify the country',
+    emoji: '🌍',
+    hintFn: id => `${COUNTRIES[id].region} · ${COUNTRIES[id].continent}`,
+    buildProjection: (topo, W, H) =>
+      d3.geoNaturalEarth1().scale(153).translate([W / 2, H / 2]),
+    buildBordersDatum: topo =>
+      topojson.mesh(topo, topo.objects.countries, (a, b) => a !== b),
+    outlineDatum: null,
+    useGraticule: true,
+    landClass: '',
+  },
+  states: {
+    label: 'states',
+    db: STATES,
+    skip: STATES_SKIP,
+    url: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
+    objName: 'states',
+    questionTag: 'Identify the state',
+    emoji: '🗺',
+    hintFn: id => `${STATES[id].region} · ${STATES[id].continent}`,
+    buildProjection: (topo, W, H) => {
+      const nation = topojson.feature(topo, topo.objects.nation);
+      return d3.geoAlbersUsa().fitExtent([[24, 24], [W - 24, H - 24]], nation);
+    },
+    buildBordersDatum: topo =>
+      topojson.mesh(topo, topo.objects.states, (a, b) => a !== b),
+    outlineDatum: topo =>
+      topojson.mesh(topo, topo.objects.nation),
+    useGraticule: false,
+    landClass: 'mode-states',
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  SVG SETUP
+// ═══════════════════════════════════════════════════════════════
+const W = 960, H = 500;
+
+const svg = d3.select('#world-map')
+  .attr('viewBox', `0 0 ${W} ${H}`)
+  .attr('preserveAspectRatio', 'xMidYMid meet');
+
+const defs = svg.append('defs');
+const glowFilter = defs.append('filter').attr('id', 'glow').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+glowFilter.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'blur');
+const glowMerge = glowFilter.append('feMerge');
+glowMerge.append('feMergeNode').attr('in', 'blur');
+glowMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+let projection, pathGen;
+
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.6, 20])
+  .on('zoom', e => mapG.attr('transform', e.transform));
+svg.call(zoomBehavior);
+
+const mapG = svg.append('g');
+const graticuleEl = mapG.append('path').attr('class', 'graticule');
+const outlineEl   = mapG.append('path').attr('class', 'nation-outline');
+const countriesG  = mapG.append('g').attr('class', 'countries-group');
+const bordersEl   = mapG.append('path').attr('class', 'borders');
+
+// ═══════════════════════════════════════════════════════════════
+//  PER-MODE CACHED DATA
+// ═══════════════════════════════════════════════════════════════
+const modeCache = { world: null, states: null }; // { features, featureById, neighborMap, validIds }
+
+// ═══════════════════════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════════════════════
+let currentMode = 'world';
+let features = [], featureById = new Map(), neighborMap = new Map(), validIds = [];
+let questions = [], currentQ = 0, score = 0, streak = 0, answered = false;
+const TOTAL = 15;
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITY
+// ═══════════════════════════════════════════════════════════════
+const pickRandom = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// ═══════════════════════════════════════════════════════════════
+//  TIERED WRONG ANSWER SELECTION
+//  Uses continent (broad) and region (sub) from either DB.
+// ═══════════════════════════════════════════════════════════════
+function getWrongAnswers(correctId) {
+  const db = MODES[currentMode].db;
+  const correct = db[correctId];
+  const nbrs = [...(neighborMap.get(correctId) || [])].filter(id => db[id]);
+  const pool = validIds.filter(id => id !== correctId);
+  const picked = new Set();
+  const result = [];
+  const diffLabels = {};
+
+  function tryPick(candidates, label) {
+    const avail = candidates.filter(id => !picked.has(id));
+    if (!avail.length) return false;
+    const id = pickRandom(avail);
+    picked.add(id); result.push(id); diffLabels[id] = label;
+    return true;
+  }
+
+  // Tier 1 — Hard: border neighbor (fall back to same region if island)
+  tryPick(nbrs, 'neighbor') ||
+  tryPick(pool.filter(id => db[id].region === correct.region), 'region');
+
+  // Tier 2 — Medium: same sub-region (not already picked)
+  tryPick(pool.filter(id => db[id].region === correct.region), 'region') ||
+  tryPick(pool.filter(id => db[id].continent === correct.continent), 'continent');
+
+  // Tier 3 — Easy: same broad area, different sub-region
+  tryPick(
+    pool.filter(id => db[id].continent === correct.continent && db[id].region !== correct.region),
+    'continent'
+  ) || tryPick(pool.filter(id => db[id].continent !== correct.continent), 'global');
+
+  // Fill remaining
+  while (result.length < 3) {
+    const diff = pool.filter(id => db[id].continent !== correct.continent && !picked.has(id));
+    const fb = diff.length ? diff : pool.filter(id => !picked.has(id));
+    if (!fb.length) break;
+    const id = pickRandom(fb); picked.add(id); result.push(id); diffLabels[id] = 'global';
+  }
+
+  return { ids: result, labels: diffLabels };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ZOOM TO FEATURE
+// ═══════════════════════════════════════════════════════════════
+function zoomToFeature(feature, duration = 750) {
+  if (!feature) return;
+  const [[x0, y0], [x1, y1]] = pathGen.bounds(feature);
+  const bw = x1 - x0, bh = y1 - y0;
+
+  if (!isFinite(x0) || bw > W * 0.7 || bw < 1 || bh < 1) {
+    const [cx, cy] = pathGen.centroid(feature);
+    if (!isFinite(cx)) return;
+    const t = d3.zoomIdentity.translate(W / 2 - 3.5 * cx, H / 2 - 3.5 * cy).scale(3.5);
+    svg.transition().duration(duration).call(zoomBehavior.transform, t);
+    return;
+  }
+
+  const pad = 72;
+  const scale = Math.min(
+    (W - pad * 2) / Math.max(bw, 1),
+    (H - pad * 2) / Math.max(bh, 1),
+    14
+  ) * 0.85;
+
+  const t = d3.zoomIdentity
+    .translate(W / 2 - scale * (x0 + x1) / 2, H / 2 - scale * (y0 + y1) / 2)
+    .scale(scale);
+  svg.transition().duration(duration).call(zoomBehavior.transform, t);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAP RENDERING
+// ═══════════════════════════════════════════════════════════════
+function renderMap(topo, cfg) {
+  projection = cfg.buildProjection(topo, W, H);
+  pathGen    = d3.geoPath().projection(projection);
+
+  if (cfg.useGraticule) {
+    graticuleEl.datum(d3.geoGraticule()()).attr('d', pathGen).style('display', null);
+  } else {
+    graticuleEl.style('display', 'none');
+  }
+
+  const outlineDatum = cfg.outlineDatum ? cfg.outlineDatum(topo) : null;
+  if (outlineDatum) {
+    outlineEl.datum(outlineDatum).attr('d', pathGen).style('display', null);
+  } else {
+    outlineEl.style('display', 'none');
+  }
+
+  countriesG
+    .attr('class', `countries-group ${cfg.landClass}`)
+    .selectAll('path')
+    .data(features)
+    .join('path')
+    .attr('class', 'country')
+    .attr('id', d => `c${d.id}`)
+    .attr('d', pathGen);
+
+  bordersEl
+    .datum(cfg.buildBordersDatum(topo))
+    .attr('class', currentMode === 'states' ? 'borders-us' : 'borders')
+    .attr('d', pathGen);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOAD MODE DATA
+// ═══════════════════════════════════════════════════════════════
+async function loadMode(modeName) {
+  if (modeCache[modeName]) return modeCache[modeName];
+
+  const cfg = MODES[modeName];
+  const topo = await d3.json(cfg.url);
+
+  const geometries = topo.objects[cfg.objName].geometries;
+  const neighborIdxs = topojson.neighbors(geometries);
+
+  // us-atlas stores FIPS codes as strings ("01", "06"…); world-atlas uses numbers.
+  // Normalize to numbers so they match the numeric keys in STATES/COUNTRIES.
+  const norm = id => typeof id === 'string' ? +id : id;
+
+  const nMap = new Map();
+  geometries.forEach((geo, i) => {
+    const id = norm(geo.id);
+    nMap.set(id, new Set(neighborIdxs[i].map(j => norm(geometries[j].id))));
+  });
+
+  const fc = topojson.feature(topo, topo.objects[cfg.objName]);
+  // Normalize feature IDs in-place so selectors like `#c6` stay consistent
+  const feats = fc.features.map(f => (f.id = norm(f.id), f));
+  const fbId = new Map(feats.map(f => [f.id, f]));
+  const vIds = feats.map(f => f.id).filter(id => cfg.db[id] && !cfg.skip.has(id));
+
+  const cache = { topo, features: feats, featureById: fbId, neighborMap: nMap, validIds: vIds };
+  modeCache[modeName] = cache;
+  return cache;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SWITCH MODE
+// ═══════════════════════════════════════════════════════════════
+async function switchMode(modeName) {
+  if (modeName === currentMode && modeCache[modeName]) {
+    startRound(); return;
+  }
+
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading').querySelector('.loading-text').textContent =
+    modeName === 'states' ? 'Loading US map…' : 'Loading world map…';
+
+  currentMode = modeName;
+
+  // Update mode toggle buttons
+  document.querySelectorAll('.mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === modeName));
+
+  const data = await loadMode(modeName);
+  features    = data.features;
+  featureById = data.featureById;
+  neighborMap = data.neighborMap;
+  validIds    = data.validIds;
+
+  renderMap(data.topo, MODES[modeName]);
+
+  // Reset map view
+  svg.call(zoomBehavior.transform, d3.zoomIdentity);
+
+  document.getElementById('loading').style.display = 'none';
+  startRound();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GAME LOGIC
+// ═══════════════════════════════════════════════════════════════
+function startRound() {
+  score = 0; streak = 0; currentQ = 0; answered = false;
+
+  questions = shuffle(validIds).slice(0, TOTAL).map(correctId => {
+    const { ids: wrongIds, labels } = getWrongAnswers(correctId);
+    const choices = shuffle([correctId, ...wrongIds]);
+    return { correctId, choices, diffLabels: { [correctId]: 'correct', ...labels } };
+  });
+
+  document.getElementById('score-screen').classList.remove('visible');
+  document.getElementById('score-screen').style.display = 'none';
+  document.getElementById('answers').style.display = 'flex';
+  document.getElementById('question-section').style.display = 'block';
+  document.getElementById('question-tag').textContent = MODES[currentMode].questionTag;
+
+  updateStats();
+  showQuestion();
+}
+
+function showQuestion() {
+  if (currentQ >= TOTAL) { showScoreScreen(); return; }
+  answered = false;
+
+  const q = questions[currentQ];
+  const db = MODES[currentMode].db;
+  const info = db[q.correctId];
+  const feature = featureById.get(q.correctId);
+
+  d3.selectAll('.country')
+    .classed('highlighted', false).classed('correct', false).classed('wrong', false)
+    .style('filter', null);
+
+  d3.select(`#c${q.correctId}`).classed('highlighted', true);
+  if (feature) zoomToFeature(feature);
+
+  document.getElementById('question-text').textContent =
+    currentMode === 'states' ? 'Which state is highlighted?' : 'Which country is highlighted?';
+  document.getElementById('region-hint').textContent =
+    MODES[currentMode].hintFn(q.correctId);
+
+  const answersDiv = document.getElementById('answers');
+  answersDiv.innerHTML = '';
+  const letters = ['A', 'B', 'C', 'D'];
+
+  q.choices.forEach((id, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.dataset.id = id;
+
+    const badge = document.createElement('span');
+    badge.className = 'diff-badge';
+    badge.dataset.diff = q.diffLabels[id] || 'global';
+
+    btn.innerHTML = `<span class="letter">${letters[i]}</span>${db[id]?.name || 'Unknown'}`;
+    btn.appendChild(badge);
+    btn.addEventListener('click', () => handleAnswer(id));
+    answersDiv.appendChild(btn);
+  });
+
+  const fb = document.getElementById('feedback');
+  fb.className = ''; fb.innerHTML = '';
+  updateStats();
+}
+
+function handleAnswer(chosenId) {
+  if (answered) return;
+  answered = true;
+
+  const q = questions[currentQ];
+  const db = MODES[currentMode].db;
+  const correct = chosenId === q.correctId;
+
+  if (correct) { score++; streak++; } else { streak = 0; }
+
+  d3.select(`#c${q.correctId}`).classed('highlighted', false).classed('correct', true).style('filter', null);
+  if (!correct) d3.select(`#c${chosenId}`).classed('wrong', true);
+
+  document.querySelectorAll('.answer-btn').forEach(btn => {
+    btn.disabled = true;
+    const id = parseInt(btn.dataset.id);
+    const badge = btn.querySelector('.diff-badge');
+    const diff = q.diffLabels[id] || 'global';
+
+    if (id === q.correctId) {
+      btn.classList.add('correct-answer');
+      badge.textContent = '✓ Correct';
+      badge.classList.add('diff-continent');
+    } else if (id === chosenId && !correct) {
+      btn.classList.add('wrong-answer');
+      badge.textContent = diff === 'neighbor'   ? '⚡ Neighbor'      :
+                          diff === 'region'     ? '~ Same division'  :
+                          diff === 'continent'  ? '~ Same area'      : '✗ Wrong';
+      badge.classList.add(`diff-${diff}`);
+    } else {
+      badge.textContent = diff === 'neighbor'  ? '⚡ Neighbor'    :
+                          diff === 'region'    ? '~ Division'      :
+                          diff === 'continent' ? '~ Area'          : '';
+      if (badge.textContent) {
+        badge.classList.add(`diff-${diff}`);
+        badge.style.opacity = '0.5';
+      }
+    }
+  });
+
+  const fb = document.getElementById('feedback');
+  if (correct) {
+    fb.className = 'correct-fb visible';
+    const msgs = ['Excellent!', 'Nailed it!', 'Perfect!', 'Well done!', "That's right!"];
+    fb.innerHTML = `<span class="fb-icon">✓</span> ${pickRandom(msgs)}`;
+  } else {
+    fb.className = 'wrong-fb visible';
+    fb.innerHTML = `<span class="fb-icon">✗</span> That's <strong>${MODES[currentMode].db[q.correctId].name}</strong>`;
+  }
+
+  updateStats();
+  setTimeout(() => { currentQ++; showQuestion(); }, correct ? 1500 : 2200);
+}
+
+function showScoreScreen() {
+  d3.selectAll('.country')
+    .classed('highlighted', false).classed('correct', false).classed('wrong', false).style('filter', null);
+  svg.transition().duration(800).call(zoomBehavior.transform, d3.zoomIdentity);
+
+  document.getElementById('answers').style.display = 'none';
+  document.getElementById('question-section').style.display = 'none';
+  document.getElementById('feedback').className = '';
+
+  const pct = Math.round((score / TOTAL) * 100);
+  const isStates = currentMode === 'states';
+
+  const grade = pct === 100 ? 'Perfect Score! 🏆'
+    : pct >= 87  ? (isStates ? 'Geography Champion'    : 'Master Navigator')
+    : pct >= 73  ? (isStates ? 'State Capital Scholar' : 'Skilled Explorer')
+    : pct >= 53  ? (isStates ? 'Regional Enthusiast'   : 'Apprentice Cartographer')
+    : pct >= 33  ? (isStates ? 'Map Curious'           : 'Curious Traveler')
+    :              (isStates ? 'Need More Road Trips'  : 'Landlubber');
+
+  document.getElementById('score-emoji').textContent = MODES[currentMode].emoji;
+  document.getElementById('final-score-num').textContent = `${score}/${TOTAL}`;
+  document.getElementById('final-grade').textContent = grade;
+  document.getElementById('final-accuracy').textContent = `${pct}% accuracy`;
+
+  const ss = document.getElementById('score-screen');
+  ss.style.display = 'flex'; ss.classList.add('visible');
+  document.getElementById('q-counter').textContent = `${TOTAL}/${TOTAL}`;
+}
+
+function updateStats() {
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('q-counter').textContent =
+    currentQ < TOTAL ? `${currentQ + 1}/${TOTAL}` : `${TOTAL}/${TOTAL}`;
+  document.getElementById('streak-display').textContent = streak;
+  document.getElementById('progress-bar').style.width =
+    (Math.min(currentQ, TOTAL) / TOTAL * 100) + '%';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTROLS
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('zoom-in').addEventListener('click', () =>
+  svg.transition().duration(300).call(zoomBehavior.scaleBy, 1.6));
+document.getElementById('zoom-out').addEventListener('click', () =>
+  svg.transition().duration(300).call(zoomBehavior.scaleBy, 1 / 1.6));
+document.getElementById('zoom-reset').addEventListener('click', () =>
+  svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity));
+
+document.getElementById('play-again').addEventListener('click', startRound);
+
+document.querySelectorAll('.mode-btn').forEach(btn =>
+  btn.addEventListener('click', () => switchMode(btn.dataset.mode)));
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════
+switchMode('world');
+</script>
+</body>
+</html>
