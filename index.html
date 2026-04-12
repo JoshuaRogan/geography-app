@@ -960,12 +960,15 @@ document.getElementById('zoom-reset').addEventListener('click', () =>
 document.getElementById('play-again').addEventListener('click', startRound);
 
 document.querySelectorAll('.mode-btn').forEach(btn =>
-  btn.addEventListener('click', () => switchMode(btn.dataset.mode)));
+  btn.addEventListener('click', () => {
+    localStorage.setItem('geoquest-mode', btn.dataset.mode);
+    switchMode(btn.dataset.mode);
+  }));
 
 // ═══════════════════════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════════════════════
-switchMode('world');
+switchMode(localStorage.getItem('geoquest-mode') || 'world');
 </script>
 </body>
 </html>
