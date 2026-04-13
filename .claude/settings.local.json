@@ -6,7 +6,11 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(open:*)",
       "WebSearch",
-      "WebFetch(domain:gist.githubusercontent.com)"
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "WebFetch(domain:code.highcharts.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(node --check /Users/jrogan/projects/geography/index.html)",
+      "Bash(grep:*)"
     ]
   }
 }
