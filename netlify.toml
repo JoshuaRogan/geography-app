@@ -1,6 +1,12 @@
 [build]
   publish = "."
 
+# Single-page app routing — serve index.html for all paths
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]

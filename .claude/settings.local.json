@@ -4,7 +4,9 @@
       "WebFetch(domain:cdn.jsdelivr.net)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "WebSearch",
+      "WebFetch(domain:gist.githubusercontent.com)"
     ]
   }
 }

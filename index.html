@@ -95,6 +95,12 @@
     .filter-chip:hover { color: var(--text); border-color: var(--text-dim); }
     .filter-chip.active { background: var(--btn-hover); color: var(--text); border-color: var(--accent); }
 
+    /* Mode group separator inside the mode toggle pill */
+    .mode-group-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+
+    /* Detail-mode land colors */
+    .mode-ireland .country { fill: #a8c890; stroke: #6a9860; stroke-width: 0.6px; }   /* soft green with county borders */
+
     /* ── Stats ── */
     #stats { display: flex; gap: 24px; flex-shrink: 0; }
 
@@ -269,10 +275,7 @@
     </div>
   </div>
   <div id="filter-bar">
-    <div id="mode-toggle">
-      <button class="mode-btn active" data-mode="world">🌍 World</button>
-      <button class="mode-btn" data-mode="states">🗺 US States</button>
-    </div>
+    <div id="mode-toggle"></div>
     <div class="filter-sep"></div>
     <div id="filter-chips"></div>
   </div>
@@ -548,11 +551,80 @@ const STATES = {
 const STATES_SKIP = new Set([11, 72, 78]); // DC, Puerto Rico, Virgin Islands
 
 // ═══════════════════════════════════════════════════════════════
+//  IRELAND — hardcoded neighbour map (GeoJSON has no arc topology)
+// ═══════════════════════════════════════════════════════════════
+const IRELAND_NEIGHBORS = new Map([
+  ['cork',      new Set(['kerry','limerick','tipperary','waterford'])],
+  ['kerry',     new Set(['cork','limerick'])],
+  ['limerick',  new Set(['cork','kerry','clare','tipperary'])],
+  ['tipperary', new Set(['cork','limerick','clare','laois','kilkenny','waterford','offaly'])],
+  ['waterford', new Set(['cork','tipperary','kilkenny','wexford'])],
+  ['clare',     new Set(['limerick','tipperary','galway'])],
+  ['kilkenny',  new Set(['tipperary','waterford','wexford','carlow','laois'])],
+  ['wexford',   new Set(['waterford','kilkenny','carlow','wicklow'])],
+  ['carlow',    new Set(['kilkenny','wexford','wicklow','kildare','laois'])],
+  ['wicklow',   new Set(['wexford','carlow','kildare','dublin'])],
+  ['dublin',    new Set(['wicklow','kildare','meath'])],
+  ['kildare',   new Set(['dublin','wicklow','carlow','laois','offaly','meath'])],
+  ['meath',     new Set(['dublin','kildare','westmeath','cavan','monaghan','louth'])],
+  ['louth',     new Set(['meath','monaghan'])],
+  ['monaghan',  new Set(['louth','meath','cavan'])],
+  ['cavan',     new Set(['monaghan','meath','westmeath','longford','leitrim'])],
+  ['laois',     new Set(['tipperary','kilkenny','carlow','kildare','offaly'])],
+  ['offaly',    new Set(['tipperary','laois','kildare','westmeath','galway','roscommon','longford'])],
+  ['westmeath', new Set(['meath','offaly','roscommon','longford','cavan'])],
+  ['longford',  new Set(['cavan','westmeath','offaly','roscommon','leitrim'])],
+  ['roscommon', new Set(['galway','mayo','sligo','leitrim','longford','westmeath','offaly'])],
+  ['galway',    new Set(['clare','roscommon','mayo','offaly'])],
+  ['mayo',      new Set(['galway','roscommon','sligo'])],
+  ['sligo',     new Set(['mayo','roscommon','leitrim','donegal'])],
+  ['leitrim',   new Set(['sligo','roscommon','longford','cavan','donegal'])],
+  ['donegal',   new Set(['leitrim','sligo'])],
+]);
+
+// ═══════════════════════════════════════════════════════════════
+//  IRELAND COUNTIES  (key = lowercase county name matching GeoJSON NAME_1)
+//  continent = Province,  region = Sub-region
+// ═══════════════════════════════════════════════════════════════
+const IRELAND_COUNTIES = {
+  // Munster
+  'cork':      { name: 'Cork',      continent: 'Munster',  region: 'South Munster' },
+  'kerry':     { name: 'Kerry',     continent: 'Munster',  region: 'South Munster' },
+  'waterford': { name: 'Waterford', continent: 'Munster',  region: 'South Munster' },
+  'limerick':  { name: 'Limerick',  continent: 'Munster',  region: 'North Munster' },
+  'tipperary': { name: 'Tipperary', continent: 'Munster',  region: 'North Munster' },
+  'clare':     { name: 'Clare',     continent: 'Munster',  region: 'North Munster' },
+  // Leinster
+  'dublin':    { name: 'Dublin',    continent: 'Leinster', region: 'East Leinster' },
+  'kildare':   { name: 'Kildare',   continent: 'Leinster', region: 'East Leinster' },
+  'wicklow':   { name: 'Wicklow',   continent: 'Leinster', region: 'East Leinster' },
+  'wexford':   { name: 'Wexford',   continent: 'Leinster', region: 'South Leinster' },
+  'carlow':    { name: 'Carlow',    continent: 'Leinster', region: 'South Leinster' },
+  'kilkenny':  { name: 'Kilkenny',  continent: 'Leinster', region: 'South Leinster' },
+  'meath':     { name: 'Meath',     continent: 'Leinster', region: 'North Leinster' },
+  'louth':     { name: 'Louth',     continent: 'Leinster', region: 'North Leinster' },
+  'laois':     { name: 'Laois',     continent: 'Leinster', region: 'Midlands' },
+  'offaly':    { name: 'Offaly',    continent: 'Leinster', region: 'Midlands' },
+  'westmeath': { name: 'Westmeath', continent: 'Leinster', region: 'Midlands' },
+  'longford':  { name: 'Longford',  continent: 'Leinster', region: 'Midlands' },
+  // Connacht
+  'galway':    { name: 'Galway',    continent: 'Connacht', region: 'Connacht' },
+  'mayo':      { name: 'Mayo',      continent: 'Connacht', region: 'Connacht' },
+  'sligo':     { name: 'Sligo',     continent: 'Connacht', region: 'Connacht' },
+  'roscommon': { name: 'Roscommon', continent: 'Connacht', region: 'Connacht' },
+  'leitrim':   { name: 'Leitrim',   continent: 'Connacht', region: 'Connacht' },
+  // Ulster (Republic of Ireland portion)
+  'donegal':   { name: 'Donegal',   continent: 'Ulster',   region: 'Ulster' },
+  'cavan':     { name: 'Cavan',     continent: 'Ulster',   region: 'Ulster' },
+  'monaghan':  { name: 'Monaghan',  continent: 'Ulster',   region: 'Ulster' },
+};
+
+// ═══════════════════════════════════════════════════════════════
 //  MODE CONFIG
 // ═══════════════════════════════════════════════════════════════
 const MODES = {
   world: {
-    label: 'world',
+    group: 'primary', slug: 'world', label: 'World',
     db: COUNTRIES,
     skip: WORLD_SKIP,
     url: 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
@@ -569,7 +641,7 @@ const MODES = {
     landClass: '',
   },
   states: {
-    label: 'states',
+    group: 'primary', slug: 'states', label: 'US States',
     db: STATES,
     skip: STATES_SKIP,
     url: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
@@ -587,6 +659,29 @@ const MODES = {
       topojson.mesh(topo, topo.objects.nation),
     useGraticule: false,
     landClass: 'mode-states',
+  },
+
+  // ── Detail modes ─────────────────────────────────────────────
+  // To add a new country: copy the ireland block, update slug/label/emoji/db/url/objName/getFeatureId
+  ireland: {
+    group: 'detail', slug: 'ireland', label: 'Ireland', emoji: '🍀',
+    db: IRELAND_COUNTIES,
+    skip: new Set(),
+    url: 'https://gist.githubusercontent.com/vool/969e3be0cfac519560755cce0b91e097/raw',
+    format: 'geojson',  // plain GeoJSON — no topojson.feature() or topojson.neighbors()
+    neighbors: IRELAND_NEIGHBORS,
+    // Extract a stable string key from the feature's properties
+    getFeatureId: f => (f.properties?.NAME_1 || '').toLowerCase().trim(),
+    questionTag: 'Identify the county',
+    hintFn: id => {
+      const c = IRELAND_COUNTIES[id];
+      return c ? `${c.region} · ${c.continent}` : '';
+    },
+    buildProjection: (_topo, W, H, feats) =>
+      d3.geoMercator().fitExtent([[30, 20], [W - 30, H - 20]],
+        { type: 'FeatureCollection', features: feats }),
+    useGraticule: false,
+    landClass: 'mode-ireland',
   },
 };
 
@@ -622,7 +717,7 @@ const bordersEl   = mapG.append('path').attr('class', 'borders');
 // ═══════════════════════════════════════════════════════════════
 //  PER-MODE CACHED DATA
 // ═══════════════════════════════════════════════════════════════
-const modeCache = { world: null, states: null }; // { features, featureById, neighborMap, validIds }
+const modeCache = {}; // keyed by mode slug, populated on first load
 
 // ═══════════════════════════════════════════════════════════════
 //  CONTINENT / REGION FILTERS
@@ -643,32 +738,63 @@ const FILTERS = {
     { key: 'Midwest',   label: 'Midwest'    },
     { key: 'West',      label: 'West'       },
   ],
+  ireland: [
+    { key: 'all',      label: 'All Counties' },
+    { key: 'Munster',  label: 'Munster'   },
+    { key: 'Leinster', label: 'Leinster'  },
+    { key: 'Connacht', label: 'Connacht'  },
+    { key: 'Ulster',   label: 'Ulster'    },
+  ],
 };
 
-const selectedFilters = {
-  world:  localStorage.getItem('geoquest-filter-world')  || 'all',
-  states: localStorage.getItem('geoquest-filter-states') || 'all',
-};
+// Initialize selectedFilters from localStorage for all known modes
+const selectedFilters = Object.fromEntries(
+  Object.keys(MODES).map(k => [k, localStorage.getItem(`geoquest-filter-${k}`) || 'all'])
+);
 
 function matchFilter(id) {
   const db = MODES[currentMode].db;
   const info = db[id];
   const key = selectedFilters[currentMode];
   if (!info || key === 'all') return true;
+  // For world mode, "Americas" spans North & South America
   if (currentMode === 'world')
     return key === 'Americas' ? info.continent.includes('America') : info.continent === key;
-  return info.continent === key; // states: continent = Northeast/South/Midwest/West
+  // For all other modes (states, ireland, future detail modes) continent = the broad grouping
+  return info.continent === key;
 }
 
 function getFilteredIds() {
   return validIds.filter(matchFilter);
 }
 
+function renderModeButtons() {
+  const wrap = document.getElementById('mode-toggle');
+  wrap.innerHTML = '';
+  let lastGroup = null;
+  Object.entries(MODES).forEach(([key, cfg]) => {
+    if (lastGroup && cfg.group !== lastGroup) {
+      const sep = document.createElement('div');
+      sep.className = 'mode-group-sep';
+      wrap.appendChild(sep);
+    }
+    lastGroup = cfg.group;
+    const btn = document.createElement('button');
+    btn.className = 'mode-btn' + (key === currentMode ? ' active' : '');
+    btn.dataset.mode = key;
+    btn.textContent = `${cfg.emoji} ${cfg.label}`;
+    btn.addEventListener('click', () => switchMode(key));
+    wrap.appendChild(btn);
+  });
+}
+
 function renderFilterChips() {
   const wrap = document.getElementById('filter-chips');
   wrap.innerHTML = '';
+  const filters = FILTERS[currentMode];
+  if (!filters) return;
   const active = selectedFilters[currentMode];
-  FILTERS[currentMode].forEach(f => {
+  filters.forEach(f => {
     const btn = document.createElement('button');
     btn.className = 'filter-chip' + (f.key === active ? ' active' : '');
     btn.textContent = f.label;
@@ -774,8 +900,8 @@ function zoomToFeature(feature, duration = 750) {
 // ═══════════════════════════════════════════════════════════════
 //  MAP RENDERING
 // ═══════════════════════════════════════════════════════════════
-function renderMap(topo, cfg) {
-  projection = cfg.buildProjection(topo, W, H);
+function renderMap(topo, cfg, feats) {
+  projection = cfg.buildProjection(topo, W, H, feats);
   pathGen    = d3.geoPath().projection(projection);
 
   if (cfg.useGraticule) {
@@ -800,10 +926,17 @@ function renderMap(topo, cfg) {
     .attr('id', d => `c${d.id}`)
     .attr('d', pathGen);
 
-  bordersEl
-    .datum(cfg.buildBordersDatum(topo))
-    .attr('class', currentMode === 'states' ? 'borders-us' : 'borders')
-    .attr('d', pathGen);
+  // GeoJSON modes (format: 'geojson') have no topology for mesh borders;
+  // borders are rendered via CSS stroke on .country instead.
+  if (topo && cfg.buildBordersDatum) {
+    bordersEl
+      .datum(cfg.buildBordersDatum(topo))
+      .attr('class', cfg.group === 'detail' || currentMode === 'states' ? 'borders-us' : 'borders')
+      .attr('d', pathGen)
+      .style('display', null);
+  } else {
+    bordersEl.style('display', 'none');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -813,24 +946,40 @@ async function loadMode(modeName) {
   if (modeCache[modeName]) return modeCache[modeName];
 
   const cfg = MODES[modeName];
-  const topo = await d3.json(cfg.url);
+  let feats, nMap, topo;
 
-  const geometries = topo.objects[cfg.objName].geometries;
-  const neighborIdxs = topojson.neighbors(geometries);
+  if (cfg.format === 'geojson') {
+    // Plain GeoJSON source — no TopoJSON processing needed
+    const gj = await d3.json(cfg.url);
+    feats = gj.features || gj;
+    feats.forEach(f => { f.id = cfg.getFeatureId(f); });
+    nMap = cfg.neighbors || new Map();
+    topo = null;
+  } else {
+    topo = await d3.json(cfg.url);
 
-  // us-atlas stores FIPS codes as strings ("01", "06"…); world-atlas uses numbers.
-  // Normalize to numbers so they match the numeric keys in STATES/COUNTRIES.
-  const norm = id => typeof id === 'string' ? +id : id;
+    const geometries = topo.objects[cfg.objName].geometries;
+    const neighborIdxs = topojson.neighbors(geometries);
 
-  const nMap = new Map();
-  geometries.forEach((geo, i) => {
-    const id = norm(geo.id);
-    nMap.set(id, new Set(neighborIdxs[i].map(j => norm(geometries[j].id))));
-  });
+    const fc = topojson.feature(topo, topo.objects[cfg.objName]);
+    feats = fc.features;
 
-  const fc = topojson.feature(topo, topo.objects[cfg.objName]);
-  // Normalize feature IDs in-place so selectors like `#c6` stay consistent
-  const feats = fc.features.map(f => (f.id = norm(f.id), f));
+    // For detail modes (with getFeatureId), extract string IDs from properties.
+    // For world/states, normalise numeric IDs.
+    if (cfg.getFeatureId) {
+      feats.forEach(f => { f.id = cfg.getFeatureId(f); });
+    } else {
+      // us-atlas stores FIPS codes as strings ("01"…); normalize to numbers.
+      feats.forEach(f => { f.id = typeof f.id === 'string' ? +f.id : f.id; });
+    }
+
+    // Build neighbor map using the now-normalised IDs
+    nMap = new Map();
+    feats.forEach((feat, i) => {
+      nMap.set(feat.id, new Set(neighborIdxs[i].map(j => feats[j].id)));
+    });
+  }
+
   const fbId = new Map(feats.map(f => [f.id, f]));
   const vIds = feats.map(f => f.id).filter(id => cfg.db[id] && !cfg.skip.has(id));
 
@@ -842,21 +991,26 @@ async function loadMode(modeName) {
 // ═══════════════════════════════════════════════════════════════
 //  SWITCH MODE
 // ═══════════════════════════════════════════════════════════════
-async function switchMode(modeName) {
+async function switchMode(modeName, pushState = true) {
+  // Update URL so the link is shareable (hash routing — works everywhere)
+  if (pushState) {
+    const slug = MODES[modeName]?.slug || modeName;
+    const hash = slug === 'world' ? '' : `#${slug}`;
+    history.pushState({ mode: modeName }, '', location.pathname + hash);
+    localStorage.setItem('geoquest-mode', modeName);
+  }
+
   if (modeName === currentMode && modeCache[modeName]) {
+    renderModeButtons();
     renderFilterChips();
     startRound(); return;
   }
 
   document.getElementById('loading').style.display = 'flex';
   document.getElementById('loading').querySelector('.loading-text').textContent =
-    modeName === 'states' ? 'Loading US map…' : 'Loading world map…';
+    `Loading ${MODES[modeName]?.label || modeName}…`;
 
   currentMode = modeName;
-
-  // Update mode toggle buttons
-  document.querySelectorAll('.mode-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.mode === modeName));
 
   const data = await loadMode(modeName);
   features    = data.features;
@@ -864,12 +1018,12 @@ async function switchMode(modeName) {
   neighborMap = data.neighborMap;
   validIds    = data.validIds;
 
-  renderMap(data.topo, MODES[modeName]);
+  renderMap(data.topo, MODES[modeName], data.features);
 
-  // Reset map view
   svg.call(zoomBehavior.transform, d3.zoomIdentity);
 
   document.getElementById('loading').style.display = 'none';
+  renderModeButtons();
   renderFilterChips();
   startRound();
 }
@@ -1046,16 +1200,28 @@ document.getElementById('zoom-reset').addEventListener('click', () =>
 
 document.getElementById('play-again').addEventListener('click', startRound);
 
-document.querySelectorAll('.mode-btn').forEach(btn =>
-  btn.addEventListener('click', () => {
-    localStorage.setItem('geoquest-mode', btn.dataset.mode);
-    switchMode(btn.dataset.mode);
-  }));
+// ═══════════════════════════════════════════════════════════════
+//  URL ROUTING
+// ═══════════════════════════════════════════════════════════════
+function getModeFromUrl() {
+  // Hash-based routing: /#ireland, /#states, /#world (or empty = world)
+  // Works locally (file://) and on any static host without server config.
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  return Object.keys(MODES).find(k => MODES[k].slug === hash)
+    || localStorage.getItem('geoquest-mode')
+    || 'world';
+}
+
+// Handle browser back/forward navigation
+window.addEventListener('popstate', e => {
+  const mode = e.state?.mode || getModeFromUrl();
+  if (MODES[mode]) switchMode(mode, false);
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════════════════════
-switchMode(localStorage.getItem('geoquest-mode') || 'world');
+switchMode(getModeFromUrl());
 </script>
 </body>
 </html>
