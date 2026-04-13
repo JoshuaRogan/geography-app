@@ -172,4 +172,14 @@ export const FILTERS = {
     { key: 'East',   label: 'East'             },
     { key: 'South',  label: 'South'            },
   ],
+  romania: [
+    { key: 'all',       label: 'All Counties' },
+    { key: 'Northwest', label: 'Northwest'    },
+    { key: 'Center',    label: 'Center'       },
+    { key: 'Northeast', label: 'Northeast'    },
+    { key: 'West',      label: 'West'         },
+    { key: 'Southwest', label: 'Southwest'    },
+    { key: 'South',     label: 'South'        },
+    { key: 'Southeast', label: 'Southeast'    },
+  ],
 };
