@@ -1,0 +1,18 @@
+export const GERMANY_STATES = {
+  'niedersachsen':       { name: 'Niedersachsen',       continent: 'Northwest', region: 'Northwest' },
+  'schleswig-holstein':  { name: 'Schleswig-Holstein',  continent: 'North',     region: 'North Sea' },
+  'berlin':              { name: 'Berlin',              continent: 'East',      region: 'City-State' },
+  'mecklenburg-vorpommern': { name: 'Mecklenburg-Vorpommern', continent: 'North', region: 'Baltic' },
+  'bremen':              { name: 'Bremen',              continent: 'Northwest', region: 'City-State' },
+  'saarland':            { name: 'Saarland',            continent: 'West',      region: 'Southwest' },
+  'bayern':              { name: 'Bayern',              continent: 'South',     region: 'Bavaria' },
+  'thüringen':           { name: 'Thüringen',           continent: 'East',      region: 'Central East' },
+  'sachsen-anhalt':      { name: 'Sachsen-Anhalt',      continent: 'East',      region: 'Central East' },
+  'sachsen':             { name: 'Sachsen',             continent: 'East',      region: 'Saxony' },
+  'brandenburg':         { name: 'Brandenburg',         continent: 'East',      region: 'Northeast' },
+  'nordrhein-westfalen': { name: 'Nordrhein-Westfalen', continent: 'West',      region: 'Rhine-Ruhr' },
+  'baden-württemberg':   { name: 'Baden-Württemberg',   continent: 'South',     region: 'Southwest' },
+  'hessen':              { name: 'Hessen',              continent: 'Center',    region: 'Central' },
+  'hamburg':             { name: 'Hamburg',             continent: 'North',     region: 'City-State' },
+  'rheinland-pfalz':     { name: 'Rheinland-Pfalz',     continent: 'West',      region: 'Rhine' },
+};

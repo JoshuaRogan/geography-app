@@ -1,0 +1,18 @@
+export const POLAND_VOIVODESHIPS = {
+  'łódź':                  { name: 'Łódź',                  continent: 'Center', region: 'Central' },
+  'masovian':              { name: 'Masovian',              continent: 'Center', region: 'Central' },
+  'greater poland':        { name: 'Greater Poland',        continent: 'Center', region: 'West Central' },
+  'kuyavian-pomeranian':   { name: 'Kuyavian-Pomeranian',   continent: 'North',  region: 'Central North' },
+  'świętokrzyskie':        { name: 'Świętokrzyskie',        continent: 'Center', region: 'Central South' },
+  'lublin':                { name: 'Lublin',                continent: 'East',   region: 'Southeast' },
+  'podlachian':            { name: 'Podlachian',            continent: 'East',   region: 'Northeast' },
+  'warmian-masurian':      { name: 'Warmian-Masurian',      continent: 'North',  region: 'Northeast' },
+  'pomeranian':            { name: 'Pomeranian',            continent: 'North',  region: 'Northwest' },
+  'west pomeranian':       { name: 'West Pomeranian',       continent: 'North',  region: 'Northwest' },
+  'lubusz':                { name: 'Lubusz',                continent: 'North',  region: 'Northwest' },
+  'lower silesian':        { name: 'Lower Silesian',        continent: 'South',  region: 'Southwest' },
+  'opole':                 { name: 'Opole',                 continent: 'South',  region: 'Southwest' },
+  'silesian':              { name: 'Silesian',              continent: 'South',  region: 'Southwest' },
+  'lesser poland':         { name: 'Lesser Poland',         continent: 'South',  region: 'Southeast' },
+  'subcarpathian':         { name: 'Subcarpathian',         continent: 'South',  region: 'Southeast' },
+};

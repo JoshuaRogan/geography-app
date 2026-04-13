@@ -1,0 +1,15 @@
+export const CANADA_PROVINCES = {
+  'ontario':                   { name: 'Ontario',                   continent: 'Central',     region: 'Ontario' },
+  'québec':                    { name: 'Québec',                    continent: 'Central',     region: 'Quebec' },
+  'british columbia':          { name: 'British Columbia',          continent: 'Pacific',     region: 'West' },
+  'alberta':                   { name: 'Alberta',                   continent: 'Prairie',     region: 'Prairie' },
+  'saskatchewan':              { name: 'Saskatchewan',              continent: 'Prairie',     region: 'Prairie' },
+  'manitoba':                  { name: 'Manitoba',                  continent: 'Prairie',     region: 'Prairie' },
+  'nova scotia':               { name: 'Nova Scotia',               continent: 'Atlantic',    region: 'Atlantic' },
+  'new brunswick':             { name: 'New Brunswick',             continent: 'Atlantic',    region: 'Atlantic' },
+  'newfoundland and labrador': { name: 'Newfoundland and Labrador', continent: 'Atlantic',    region: 'Atlantic' },
+  'prince edward island':      { name: 'Prince Edward Island',      continent: 'Atlantic',    region: 'Atlantic' },
+  'northwest territories':     { name: 'Northwest Territories',     continent: 'Territories', region: 'Sub-Arctic' },
+  'nunavut':                   { name: 'Nunavut',                   continent: 'Territories', region: 'Arctic' },
+  'yukon':                     { name: 'Yukon',                     continent: 'Territories', region: 'Sub-Arctic' },
+};
