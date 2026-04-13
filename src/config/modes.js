@@ -22,6 +22,7 @@ import { EGYPT_GOVERNORATES } from '../data/egypt.js';
 import { TURKEY_PROVINCES } from '../data/turkey.js';
 import { POLAND_VOIVODESHIPS } from '../data/poland.js';
 import { ROMANIA_COUNTIES } from '../data/romania.js';
+import { SCOTLAND_COUNCILS } from '../data/scotland.js';
 
 export const MODES = {
   world: {
@@ -308,6 +309,30 @@ export const MODES = {
     objName: 'default', getFeatureId: f => (f.properties?.name || '').toLowerCase().trim(),
     questionTag: 'Identify the voivodeship',
     hintFn: id => { const r = POLAND_VOIVODESHIPS[id]; return r ? `${r.region} · ${r.continent}` : ''; },
+    buildProjection: (topo, W, H, feats) => d3.geoMercator().fitExtent([[30,20],[W-30,H-20]],{type:'FeatureCollection',features:feats}),
+    buildBordersDatum: topo => topojson.mesh(topo, topo.objects.default, (a,b) => a!==b),
+    outlineDatum: topo => topojson.mesh(topo, topo.objects.default, (a,b) => a===b),
+    useGraticule: false, landClass: 'mode-detail',
+  },
+  scotland: {
+    group: 'detail', slug: 'scotland', label: 'Scotland', emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+    db: SCOTLAND_COUNCILS, skip: new Set(),
+    url: 'data/countries/gb-sct/gb-sct-all.topo.json',
+    objName: 'default',
+    getFeatureId: f => {
+      const n = (f.properties?.name || '').toLowerCase().trim();
+      if (n === 'aberdeen')              return 'aberdeen city';
+      if (n === 'dundee')               return 'dundee city';
+      if (n === 'edinburgh')            return 'city of edinburgh';
+      if (n === 'glasgow')              return 'glasgow city';
+      if (n === 'eilean siar')          return 'na h-eileanan siar';
+      if (n === 'orkney')               return 'orkney islands';
+      if (n === 'perthshire and kinross') return 'perth and kinross';
+      if (n === 'north ayshire')        return 'north ayrshire';
+      return n;
+    },
+    questionTag: 'Identify the council area',
+    hintFn: id => { const r = SCOTLAND_COUNCILS[id]; return r ? `${r.region} · ${r.continent}` : ''; },
     buildProjection: (topo, W, H, feats) => d3.geoMercator().fitExtent([[30,20],[W-30,H-20]],{type:'FeatureCollection',features:feats}),
     buildBordersDatum: topo => topojson.mesh(topo, topo.objects.default, (a,b) => a!==b),
     outlineDatum: topo => topojson.mesh(topo, topo.objects.default, (a,b) => a===b),

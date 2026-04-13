@@ -172,6 +172,15 @@ export const FILTERS = {
     { key: 'East',   label: 'East'             },
     { key: 'South',  label: 'South'            },
   ],
+  scotland: [
+    { key: 'all',       label: 'All Council Areas' },
+    { key: 'North',     label: 'North'             },
+    { key: 'Northeast', label: 'Northeast'         },
+    { key: 'East',      label: 'East'              },
+    { key: 'Central',   label: 'Central'           },
+    { key: 'Southwest', label: 'Southwest'         },
+    { key: 'South',     label: 'South'             },
+  ],
   romania: [
     { key: 'all',       label: 'All Counties' },
     { key: 'Northwest', label: 'Northwest'    },
