@@ -56,23 +56,44 @@
       justify-content: center; font-size: 15px;
     }
 
-    /* ── Mode Toggle ── */
+    /* ── Filter Bar (mode toggle + continent chips) ── */
+    #filter-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 16px;
+      background: var(--panel); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+    }
+    #filter-bar::-webkit-scrollbar { display: none; }
+
     #mode-toggle {
-      display: flex; gap: 4px;
+      display: flex; gap: 3px; flex-shrink: 0;
       background: var(--ocean); border-radius: 8px; padding: 3px;
       border: 1px solid var(--border);
     }
 
     .mode-btn {
-      padding: 5px 14px; background: transparent;
+      padding: 4px 12px; background: transparent;
       border: none; border-radius: 6px;
-      color: var(--text-dim); font-size: 13px; font-weight: 500;
+      color: var(--text-dim); font-size: 12px; font-weight: 500;
       font-family: 'Inter', sans-serif; cursor: pointer;
       transition: all 0.18s; white-space: nowrap;
     }
-
     .mode-btn:hover { color: var(--text); }
     .mode-btn.active { background: var(--btn-hover); color: var(--text); }
+
+    .filter-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+    #filter-chips { display: flex; gap: 5px; align-items: center; }
+
+    .filter-chip {
+      padding: 4px 13px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-dim); font-size: 12px; font-weight: 500;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      white-space: nowrap; transition: all 0.15s; flex-shrink: 0;
+    }
+    .filter-chip:hover { color: var(--text); border-color: var(--text-dim); }
+    .filter-chip.active { background: var(--btn-hover); color: var(--text); border-color: var(--accent); }
 
     /* ── Stats ── */
     #stats { display: flex; gap: 24px; flex-shrink: 0; }
@@ -219,8 +240,9 @@
     @media (max-width: 768px) {
       #main { flex-direction: column; }
       #game-panel { width: 100%; flex-shrink: 0; height: auto; max-height: 50vh; border-left: none; border-top: 1px solid var(--border); }
-      #stats { gap: 16px; }
-      .stat-value { font-size: 17px; }
+      #stats { gap: 14px; }
+      .stat-value { font-size: 16px; }
+      #header { padding: 0 14px; }
     }
   </style>
 </head>
@@ -230,10 +252,6 @@
     <div class="logo">
       <div class="logo-icon">🌍</div>
       GeoQuest
-    </div>
-    <div id="mode-toggle">
-      <button class="mode-btn active" data-mode="world">🌍 World</button>
-      <button class="mode-btn" data-mode="states">🗺 US States</button>
     </div>
     <div id="stats">
       <div class="stat">
@@ -249,6 +267,14 @@
         <span class="stat-value" id="streak-display">0</span>
       </div>
     </div>
+  </div>
+  <div id="filter-bar">
+    <div id="mode-toggle">
+      <button class="mode-btn active" data-mode="world">🌍 World</button>
+      <button class="mode-btn" data-mode="states">🗺 US States</button>
+    </div>
+    <div class="filter-sep"></div>
+    <div id="filter-chips"></div>
   </div>
   <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
   <div id="main">
@@ -599,6 +625,64 @@ const bordersEl   = mapG.append('path').attr('class', 'borders');
 const modeCache = { world: null, states: null }; // { features, featureById, neighborMap, validIds }
 
 // ═══════════════════════════════════════════════════════════════
+//  CONTINENT / REGION FILTERS
+// ═══════════════════════════════════════════════════════════════
+const FILTERS = {
+  world: [
+    { key: 'all',      label: 'All Regions' },
+    { key: 'Africa',   label: 'Africa'   },
+    { key: 'Asia',     label: 'Asia'     },
+    { key: 'Europe',   label: 'Europe'   },
+    { key: 'Americas', label: 'Americas' },
+    { key: 'Oceania',  label: 'Oceania'  },
+  ],
+  states: [
+    { key: 'all',       label: 'All States' },
+    { key: 'Northeast', label: 'Northeast'  },
+    { key: 'South',     label: 'South'      },
+    { key: 'Midwest',   label: 'Midwest'    },
+    { key: 'West',      label: 'West'       },
+  ],
+};
+
+const selectedFilters = {
+  world:  localStorage.getItem('geoquest-filter-world')  || 'all',
+  states: localStorage.getItem('geoquest-filter-states') || 'all',
+};
+
+function matchFilter(id) {
+  const db = MODES[currentMode].db;
+  const info = db[id];
+  const key = selectedFilters[currentMode];
+  if (!info || key === 'all') return true;
+  if (currentMode === 'world')
+    return key === 'Americas' ? info.continent.includes('America') : info.continent === key;
+  return info.continent === key; // states: continent = Northeast/South/Midwest/West
+}
+
+function getFilteredIds() {
+  return validIds.filter(matchFilter);
+}
+
+function renderFilterChips() {
+  const wrap = document.getElementById('filter-chips');
+  wrap.innerHTML = '';
+  const active = selectedFilters[currentMode];
+  FILTERS[currentMode].forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-chip' + (f.key === active ? ' active' : '');
+    btn.textContent = f.label;
+    btn.addEventListener('click', () => {
+      selectedFilters[currentMode] = f.key;
+      localStorage.setItem(`geoquest-filter-${currentMode}`, f.key);
+      renderFilterChips();
+      startRound();
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  GAME STATE
 // ═══════════════════════════════════════════════════════════════
 let currentMode = 'world';
@@ -760,6 +844,7 @@ async function loadMode(modeName) {
 // ═══════════════════════════════════════════════════════════════
 async function switchMode(modeName) {
   if (modeName === currentMode && modeCache[modeName]) {
+    renderFilterChips();
     startRound(); return;
   }
 
@@ -785,6 +870,7 @@ async function switchMode(modeName) {
   svg.call(zoomBehavior.transform, d3.zoomIdentity);
 
   document.getElementById('loading').style.display = 'none';
+  renderFilterChips();
   startRound();
 }
 
@@ -794,7 +880,7 @@ async function switchMode(modeName) {
 function startRound() {
   score = 0; streak = 0; currentQ = 0; answered = false;
 
-  questions = shuffle(validIds).slice(0, TOTAL).map(correctId => {
+  questions = shuffle(getFilteredIds()).slice(0, TOTAL).map(correctId => {
     const { ids: wrongIds, labels } = getWrongAnswers(correctId);
     const choices = shuffle([correctId, ...wrongIds]);
     return { correctId, choices, diffLabels: { [correctId]: 'correct', ...labels } };
@@ -811,7 +897,7 @@ function startRound() {
 }
 
 function showQuestion() {
-  if (currentQ >= TOTAL) { showScoreScreen(); return; }
+  if (currentQ >= questions.length) { showScoreScreen(); return; }
   answered = false;
 
   const q = questions[currentQ];
@@ -918,7 +1004,7 @@ function showScoreScreen() {
   document.getElementById('question-section').style.display = 'none';
   document.getElementById('feedback').className = '';
 
-  const pct = Math.round((score / TOTAL) * 100);
+  const pct = Math.round((score / questions.length) * 100);
   const isStates = currentMode === 'states';
 
   const grade = pct === 100 ? 'Perfect Score! 🏆'
@@ -929,22 +1015,23 @@ function showScoreScreen() {
     :              (isStates ? 'Need More Road Trips'  : 'Landlubber');
 
   document.getElementById('score-emoji').textContent = MODES[currentMode].emoji;
-  document.getElementById('final-score-num').textContent = `${score}/${TOTAL}`;
+  document.getElementById('final-score-num').textContent = `${score}/${questions.length}`;
   document.getElementById('final-grade').textContent = grade;
   document.getElementById('final-accuracy').textContent = `${pct}% accuracy`;
 
   const ss = document.getElementById('score-screen');
   ss.style.display = 'flex'; ss.classList.add('visible');
-  document.getElementById('q-counter').textContent = `${TOTAL}/${TOTAL}`;
+  document.getElementById('q-counter').textContent = `${questions.length}/${questions.length}`;
 }
 
 function updateStats() {
+  const total = questions.length || TOTAL;
   document.getElementById('score-display').textContent = score;
   document.getElementById('q-counter').textContent =
-    currentQ < TOTAL ? `${currentQ + 1}/${TOTAL}` : `${TOTAL}/${TOTAL}`;
+    currentQ < total ? `${currentQ + 1}/${total}` : `${total}/${total}`;
   document.getElementById('streak-display').textContent = streak;
   document.getElementById('progress-bar').style.width =
-    (Math.min(currentQ, TOTAL) / TOTAL * 100) + '%';
+    (Math.min(currentQ, total) / total * 100) + '%';
 }
 
 // ═══════════════════════════════════════════════════════════════
