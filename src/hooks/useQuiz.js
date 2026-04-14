@@ -14,9 +14,10 @@ const shuffle = arr => {
   return a;
 };
 
-function getWrongAnswers(correctId, validIds, neighborMap, currentMode) {
-  const db = MODES[currentMode].db;
+function getWrongAnswers(correctId, validIds, neighborMap, mode) {
+  const db = MODES[mode].db;
   const correct = db[correctId];
+  if (!correct) return { ids: [], labels: {} };
   const nbrs = [...(neighborMap.get(correctId) || [])].filter(id => db[id]);
   const pool = validIds.filter(id => id !== correctId);
   const picked = new Set();
@@ -31,23 +32,19 @@ function getWrongAnswers(correctId, validIds, neighborMap, currentMode) {
     return true;
   }
 
-  // Tier 1 — Hard: border neighbor (fall back to same region if island)
   tryPick(nbrs, 'neighbor') ||
-  tryPick(pool.filter(id => db[id].region === correct.region), 'region');
+  tryPick(pool.filter(id => db[id]?.region === correct.region), 'region');
 
-  // Tier 2 — Medium: same sub-region (not already picked)
-  tryPick(pool.filter(id => db[id].region === correct.region), 'region') ||
-  tryPick(pool.filter(id => db[id].continent === correct.continent), 'continent');
+  tryPick(pool.filter(id => db[id]?.region === correct.region), 'region') ||
+  tryPick(pool.filter(id => db[id]?.continent === correct.continent), 'continent');
 
-  // Tier 3 — Easy: same broad area, different sub-region
   tryPick(
-    pool.filter(id => db[id].continent === correct.continent && db[id].region !== correct.region),
+    pool.filter(id => db[id]?.continent === correct.continent && db[id]?.region !== correct.region),
     'continent'
-  ) || tryPick(pool.filter(id => db[id].continent !== correct.continent), 'global');
+  ) || tryPick(pool.filter(id => db[id]?.continent !== correct.continent), 'global');
 
-  // Fill remaining
   while (result.length < 3) {
-    const diff = pool.filter(id => db[id].continent !== correct.continent && !picked.has(id));
+    const diff = pool.filter(id => db[id]?.continent !== correct.continent && !picked.has(id));
     const fb = diff.length ? diff : pool.filter(id => !picked.has(id));
     if (!fb.length) break;
     const id = pickRandom(fb); picked.add(id); result.push(id); diffLabels[id] = 'global';
@@ -56,14 +53,23 @@ function getWrongAnswers(correctId, validIds, neighborMap, currentMode) {
   return { ids: result, labels: diffLabels };
 }
 
-function matchFilter(id, currentMode, selectedFilters) {
-  const db = MODES[currentMode].db;
+function matchFilter(id, mode, filterKey) {
+  const db = MODES[mode]?.db;
+  if (!db) return true;
   const info = db[id];
-  const key = selectedFilters[currentMode];
-  if (!info || key === 'all') return true;
-  if (currentMode === 'world')
-    return key === 'Americas' ? info.continent.includes('America') : info.continent === key;
-  return info.continent === key;
+  if (!info || !filterKey || filterKey === 'all') return true;
+  if (mode === 'world')
+    return filterKey === 'Americas' ? info.continent.includes('America') : info.continent === filterKey;
+  return info.region === filterKey || info.continent === filterKey;
+}
+
+function buildQuestions(validIds, neighborMap, mode, filterKey) {
+  const filteredIds = validIds.filter(id => matchFilter(id, mode, filterKey));
+  return shuffle(filteredIds).slice(0, TOTAL).map(correctId => {
+    const { ids: wrongIds, labels } = getWrongAnswers(correctId, filteredIds, neighborMap, mode);
+    const choices = shuffle([correctId, ...wrongIds]);
+    return { correctId, choices, diffLabels: { [correctId]: 'correct', ...labels } };
+  });
 }
 
 export function useQuiz(currentMode) {
@@ -72,23 +78,28 @@ export function useQuiz(currentMode) {
   const [currentQ, setCurrentQ] = useState(0);
   const [questions, setQuestions] = useState([]);
   const [answered, setAnswered] = useState(false);
-  const [phase, setPhase] = useState('playing'); // 'playing' | 'score'
-  const [feedback, setFeedback] = useState(null); // null | { correct, message }
-  const [answerResults, setAnswerResults] = useState(null); // null | { correctId, chosenId, diffLabels }
+  const [phase, setPhase] = useState('playing');
+  const [feedback, setFeedback] = useState(null);
+  const [answerResults, setAnswerResults] = useState(null);
 
   // selectedFilters persisted in localStorage
-  const [selectedFilters, setSelectedFilters] = useState(() => {
-    return Object.fromEntries(
+  const [selectedFilters, setSelectedFilters] = useState(() =>
+    Object.fromEntries(
       Object.keys(MODES).map(k => [k, localStorage.getItem(`geoquest-filter-${k}`) || 'all'])
-    );
-  });
+    )
+  );
+
+  // Keep refs so callbacks always read the latest values without needing them as deps.
+  const currentModeRef = useRef(currentMode);
+  currentModeRef.current = currentMode;
+  const selectedFiltersRef = useRef(selectedFilters);
+  selectedFiltersRef.current = selectedFilters;
 
   // Clear stale questions immediately when mode changes so GamePanel never renders
-  // old-mode question IDs against the new-mode's DB (which crashes hintFn).
+  // old-mode question IDs against the new-mode's DB.
   const prevModeRef = useRef(currentMode);
   if (prevModeRef.current !== currentMode) {
     prevModeRef.current = currentMode;
-    // Synchronous state resets during render are safe in React when guarded by a ref change
     setQuestions([]);
     setCurrentQ(0);
     setAnswered(false);
@@ -97,22 +108,11 @@ export function useQuiz(currentMode) {
     setPhase('playing');
   }
 
-  // Map data stored externally, passed in from useMapD3 via App
-  const mapDataRef = useRef({ validIds: [], neighborMap: new Map() });
-
-  const buildQuestions = useCallback((validIds, neighborMap, mode) => {
-    const filteredIds = validIds.filter(id => matchFilter(id, mode, selectedFilters));
-    const qs = shuffle(filteredIds).slice(0, TOTAL).map(correctId => {
-      const { ids: wrongIds, labels } = getWrongAnswers(correctId, filteredIds, neighborMap, mode);
-      const choices = shuffle([correctId, ...wrongIds]);
-      return { correctId, choices, diffLabels: { [correctId]: 'correct', ...labels } };
-    });
-    return qs;
-  }, [selectedFilters]);
-
+  // startRound always reads latest mode and filters from refs — no stale closures.
   const startRound = useCallback((validIds, neighborMap, mode) => {
-    mapDataRef.current = { validIds, neighborMap };
-    const qs = buildQuestions(validIds, neighborMap, mode || currentMode);
+    const m = mode || currentModeRef.current;
+    const filterKey = selectedFiltersRef.current[m] || 'all';
+    const qs = buildQuestions(validIds, neighborMap, m, filterKey);
     setQuestions(qs);
     setCurrentQ(0);
     setScore(0);
@@ -121,7 +121,7 @@ export function useQuiz(currentMode) {
     setPhase('playing');
     setFeedback(null);
     setAnswerResults(null);
-  }, [buildQuestions, currentMode]);
+  }, []); // stable — reads from refs
 
   const handleAnswer = useCallback((chosenId) => {
     if (answered) return;
@@ -138,7 +138,7 @@ export function useQuiz(currentMode) {
         setFeedback({ correct: true, message: pickRandom(['Excellent!', 'Nailed it!', 'Perfect!', 'Well done!', "That's right!"]) });
       } else {
         setStreak(0);
-        const correctName = MODES[currentMode]?.db[q.correctId]?.name || '';
+        const correctName = MODES[currentModeRef.current]?.db[q.correctId]?.name || '';
         setFeedback({ correct: false, correctName });
       }
 
@@ -160,7 +160,7 @@ export function useQuiz(currentMode) {
 
       return qs;
     });
-  }, [answered, currentQ, currentMode]);
+  }, [answered, currentQ]);
 
   const setFilter = useCallback((mode, key) => {
     localStorage.setItem(`geoquest-filter-${mode}`, key);

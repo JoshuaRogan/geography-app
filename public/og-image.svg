@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#0f2d1f"/>
+      <stop offset="100%" stop-color="#071a10"/>
+    </radialGradient>
+    <radialGradient id="globe-bg" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#1a6b3c"/>
+      <stop offset="100%" stop-color="#0d4a28"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines -->
+  <g stroke="#1a6b3c" stroke-width="1" opacity="0.15">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- Globe -->
+  <circle cx="880" cy="315" r="230" fill="url(#globe-bg)"/>
+  <!-- Globe latitude lines -->
+  <ellipse cx="880" cy="315" rx="230" ry="60" fill="none" stroke="#4ade80" stroke-width="1.5" opacity="0.5"/>
+  <ellipse cx="880" cy="220" rx="200" ry="50" fill="none" stroke="#4ade80" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="880" cy="410" rx="200" ry="50" fill="none" stroke="#4ade80" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="880" cy="145" rx="140" ry="35" fill="none" stroke="#4ade80" stroke-width="0.8" opacity="0.2"/>
+  <ellipse cx="880" cy="485" rx="140" ry="35" fill="none" stroke="#4ade80" stroke-width="0.8" opacity="0.2"/>
+  <!-- Globe longitude lines -->
+  <ellipse cx="880" cy="315" rx="60" ry="230" fill="none" stroke="#4ade80" stroke-width="1.5" opacity="0.5"/>
+  <ellipse cx="880" cy="315" rx="130" ry="230" fill="none" stroke="#4ade80" stroke-width="1" opacity="0.3"/>
+  <ellipse cx="880" cy="315" rx="190" ry="230" fill="none" stroke="#4ade80" stroke-width="0.8" opacity="0.2"/>
+  <!-- Globe outline -->
+  <circle cx="880" cy="315" r="230" fill="none" stroke="#4ade80" stroke-width="2.5"/>
+
+  <!-- Clip globe edges -->
+  <circle cx="880" cy="315" r="230" fill="none" stroke="#071a10" stroke-width="0"/>
+
+  <!-- Text content -->
+  <text x="100" y="240" font-family="Georgia, serif" font-size="88" font-weight="700" fill="#f0fdf4" letter-spacing="-2">GeoQuest</text>
+  <text x="104" y="310" font-family="Arial, sans-serif" font-size="30" font-weight="400" fill="#4ade80" letter-spacing="4">WORLD GEOGRAPHY QUIZ</text>
+
+  <!-- Divider -->
+  <rect x="100" y="345" width="80" height="3" fill="#4ade80" rx="2"/>
+
+  <text x="100" y="410" font-family="Arial, sans-serif" font-size="26" fill="#86efac" opacity="0.9">Test your knowledge of countries,</text>
+  <text x="100" y="448" font-family="Arial, sans-serif" font-size="26" fill="#86efac" opacity="0.9">capitals, and regions worldwide.</text>
+
+  <!-- URL -->
+  <text x="100" y="560" font-family="Arial, sans-serif" font-size="22" fill="#4ade80" opacity="0.6">geo.joshuarogan.com</text>
+</svg>

@@ -33,6 +33,8 @@ export function App() {
   const { score, streak, currentQ, questions, answered, phase, feedback, answerResults, selectedFilters, setFilter, startRound, handleAnswer, TOTAL } = quiz;
 
   const loadedModeRef = useRef(null);
+  const mapDataRef = useRef(mapData);
+  mapDataRef.current = mapData;
 
   const handleModeLoaded = useCallback(({ features, featureById, neighborMap, validIds }) => {
     setMapData({ features, featureById, neighborMap, validIds });
@@ -42,7 +44,7 @@ export function App() {
   const mapD3 = useMapD3({ onModeLoaded: handleModeLoaded });
   const { initSvg, switchMode, highlightFeature, markAnswer, clearHighlights, zoomToFeature, zoomIn, zoomOut, zoomReset } = mapD3;
 
-  // Called once when the SVG element mounts — just init D3, then let the effect below drive loading
+  // Called once when the SVG element mounts
   const handleSvgReady = useCallback((svgEl) => {
     initSvg(svgEl);
     setSvgReady(true);
@@ -57,6 +59,24 @@ export function App() {
     setLoadingLabel(`Loading ${MODES[currentMode]?.label || currentMode}…`);
     switchMode(currentMode);
   }, [svgReady, currentMode, switchMode]);
+
+  // Start a new round when map data finishes loading
+  useEffect(() => {
+    if (!loading && mapData.validIds.length > 0) {
+      startRound(mapData.validIds, mapData.neighborMap, currentMode);
+    }
+  }, [loading, mapData, currentMode, startRound]);
+
+  // Restart round when filter changes
+  const prevFiltersRef = useRef(selectedFilters);
+  useEffect(() => {
+    if (prevFiltersRef.current === selectedFilters) return;
+    prevFiltersRef.current = selectedFilters;
+    const md = mapDataRef.current;
+    if (!loading && md.validIds.length > 0) {
+      startRound(md.validIds, md.neighborMap, currentMode);
+    }
+  }, [selectedFilters, loading, currentMode, startRound]);
 
   // Highlight current question on the map
   useEffect(() => {
@@ -80,13 +100,6 @@ export function App() {
     if (phase === 'score') clearHighlights();
   }, [phase, clearHighlights]);
 
-  // Start a new round when map data finishes loading
-  useEffect(() => {
-    if (!loading && mapData.validIds.length > 0) {
-      startRound(mapData.validIds, mapData.neighborMap, currentMode);
-    }
-  }, [loading, mapData]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleModeChange = useCallback((modeName) => {
     if (modeName === currentMode) return;
     localStorage.setItem('geoquest-mode', modeName);
@@ -95,12 +108,12 @@ export function App() {
 
   const handleFilterChange = useCallback((mode, key) => {
     setFilter(mode, key);
-    setTimeout(() => startRound(mapData.validIds, mapData.neighborMap, mode), 0);
-  }, [setFilter, startRound, mapData]);
+  }, [setFilter]);
 
   const handlePlayAgain = useCallback(() => {
-    startRound(mapData.validIds, mapData.neighborMap, currentMode);
-  }, [startRound, mapData, currentMode]);
+    const md = mapDataRef.current;
+    startRound(md.validIds, md.neighborMap, currentMode);
+  }, [startRound, currentMode]);
 
   const total = questions.length || TOTAL;
   const progress = phase === 'score' ? 100 : total > 0 ? (Math.min(currentQ, total) / total * 100) : 0;
