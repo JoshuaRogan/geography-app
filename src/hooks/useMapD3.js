@@ -8,11 +8,13 @@ const W = 960, H = 500;
 // Per-mode cache so data is only fetched once
 const modeCache = {};
 
-export function useMapD3({ onModeLoaded }) {
+export function useMapD3({ onModeLoaded, onFeatureClick }) {
   const svgRef = useRef(null);
   const zoomRef = useRef(null);
   const pathGenRef = useRef(null);
   const mapGRef = useRef(null);
+  const onFeatureClickRef = useRef(onFeatureClick);
+  onFeatureClickRef.current = onFeatureClick;
 
   const initSvg = useCallback((svgEl) => {
     if (!svgEl || mapGRef.current) return;
@@ -101,7 +103,13 @@ export function useMapD3({ onModeLoaded }) {
       .join('path')
       .attr('class', 'country')
       .attr('id', d => `c${d.id}`)
-      .attr('d', pathGen);
+      .attr('d', pathGen)
+      .on('click', function(event, d) {
+        if (onFeatureClickRef.current) {
+          event.stopPropagation();
+          onFeatureClickRef.current(d.id);
+        }
+      });
 
     const bordersEl = mapG.select('[data-role="borders"]');
     if (topo && cfg.buildBordersDatum) {
@@ -148,8 +156,9 @@ export function useMapD3({ onModeLoaded }) {
 
     const fbId = new Map(feats.map(f => [f.id, f]));
     const vIds = feats.map(f => f.id).filter(id => cfg.db[id] && !cfg.skip.has(id));
+    const centroids = new Map(feats.map(f => [f.id, d3.geoCentroid(f)]));
 
-    const cache = { topo, features: feats, featureById: fbId, neighborMap: nMap, validIds: vIds };
+    const cache = { topo, features: feats, featureById: fbId, neighborMap: nMap, validIds: vIds, centroids };
     modeCache[modeName] = cache;
     return cache;
   }, []);
@@ -170,6 +179,7 @@ export function useMapD3({ onModeLoaded }) {
       featureById: data.featureById,
       neighborMap: data.neighborMap,
       validIds: data.validIds,
+      centroids: data.centroids,
     });
   }, [loadMode, renderMap, onModeLoaded]);
 
@@ -218,6 +228,22 @@ export function useMapD3({ onModeLoaded }) {
     svgRef.current.transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity);
   }, []);
 
+  const markFindGuess = useCallback((id, color) => {
+    d3.select(`[id="c${id}"]`).style('fill', color, 'important').classed('guessed', true);
+  }, []);
+
+  const markFindCorrect = useCallback((id) => {
+    d3.select(`[id="c${id}"]`).style('fill', null).classed('guessed', false).classed('correct', true);
+  }, []);
+
+  const clearFindGuesses = useCallback(() => {
+    if (!mapGRef.current) return;
+    mapGRef.current.selectAll('.country')
+      .style('fill', null)
+      .classed('guessed', false)
+      .classed('correct', false);
+  }, []);
+
   return {
     initSvg,
     switchMode,
@@ -228,5 +254,8 @@ export function useMapD3({ onModeLoaded }) {
     zoomIn,
     zoomOut,
     zoomReset,
+    markFindGuess,
+    markFindCorrect,
+    clearFindGuesses,
   };
 }

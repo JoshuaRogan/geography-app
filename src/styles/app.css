@@ -135,6 +135,11 @@ html, body { width: 100%; height: 100%; background: var(--ocean); font-family: '
 .country.correct { fill: var(--correct) !important; filter: none; }
 .country.wrong   { fill: var(--wrong)   !important; filter: none; }
 
+/* Pointer cursor and hover highlight in find mode.
+   .guessed is added by JS when a feature has been clicked; suppresses hover. */
+.find-mode .country { cursor: crosshair; }
+.find-mode .country:not(.guessed):not(.correct):hover { fill: #fff !important; transition: fill 0.1s ease; }
+
 .borders { fill: none; stroke: var(--ocean); stroke-width: 0.6px; pointer-events: none; }
 .borders-us { fill: none; stroke: var(--ocean); stroke-width: 0.8px; pointer-events: none; }
 .nation-outline { fill: none; stroke: var(--ocean-mid); stroke-width: 1px; pointer-events: none; opacity: 0.6; }
@@ -237,6 +242,95 @@ html, body { width: 100%; height: 100%; background: var(--ocean); font-family: '
   letter-spacing: 0.02em; transition: background 0.2s, transform 0.1s;
 }
 #play-again:hover { background: var(--highlight2); transform: translateY(-1px); }
+
+/* ── Game Type Toggle ── */
+.game-type-toggle {
+  display: flex; gap: 3px; flex-shrink: 0;
+  background: var(--ocean); border-radius: 8px; padding: 3px;
+  border: 1px solid var(--border);
+}
+
+.game-type-btn {
+  padding: 4px 11px; background: transparent;
+  border: none; border-radius: 6px;
+  color: var(--text-dim); font-size: 12px; font-weight: 500;
+  font-family: 'Inter', sans-serif; cursor: pointer;
+  transition: all 0.18s; white-space: nowrap;
+}
+.game-type-btn:hover { color: var(--text); }
+.game-type-btn.active { background: var(--accent); color: #fff; }
+
+/* ── Find Panel ── */
+#find-target-section {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center;
+  padding: 28px 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 14px;
+}
+
+#find-target-section #question-tag { margin-bottom: 0; }
+
+#find-target-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 32px; font-weight: 700;
+  color: var(--text); line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+#find-clue-btn {
+  padding: 6px 16px;
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 20px; color: var(--text-dim);
+  font-size: 12px; font-family: 'Inter', sans-serif;
+  cursor: pointer; transition: all 0.15s;
+}
+#find-clue-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+#find-clue-text {
+  font-size: 12px; color: var(--accent);
+  background: rgba(74,158,218,0.1); border-radius: 20px;
+  padding: 5px 14px;
+}
+
+#find-feedback-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+
+.find-result { text-align: center; }
+
+.find-result-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+.find-result-text {
+  font-size: 1rem; font-weight: 600; color: var(--correct);
+}
+
+.find-result-heat {
+  font-size: 1.8rem; font-weight: 700; margin-bottom: 0.35rem;
+}
+
+.find-result-distance {
+  font-size: 0.9rem; color: var(--text-dim);
+}
+
+.find-result-hint {
+  margin-top: 0.4rem; font-size: 0.8rem; color: #666;
+}
+
+.find-click-prompt {
+  color: var(--text-dim); font-size: 0.9rem;
+  border: 1px dashed var(--border); border-radius: 10px;
+  padding: 1.5rem 2rem;
+}
+
+#find-progress {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.75rem 0; font-size: 0.8rem; color: var(--text-dim);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+
+.find-score { color: var(--gold); font-weight: 600; }
 
 /* ── Loading ── */
 #loading {
