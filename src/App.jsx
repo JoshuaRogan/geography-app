@@ -220,25 +220,24 @@ export function App() {
     }
   }, [isFindMode, lastGuess, markFindGuess, markFindCorrect]);
 
-  // On new find-mode question: clear markers and zoom reset
+  // On new find-mode question: clear markers. Zoom persists between questions
+  // so the user doesn't have to re-zoom each round.
   const prevFindQRef = useRef(0);
+  const findInitRef = useRef(false);
   useEffect(() => {
-    if (!isFindMode) return;
-    if (prevFindQRef.current === findQuiz.currentQ && prevFindQRef.current === 0) {
-      // initial load — just reset zoom
-      zoomReset();
+    if (!isFindMode) {
+      findInitRef.current = false;
+      return;
+    }
+    if (!findInitRef.current) {
+      findInitRef.current = true;
+      prevFindQRef.current = findQuiz.currentQ;
       return;
     }
     if (prevFindQRef.current === findQuiz.currentQ) return;
     prevFindQRef.current = findQuiz.currentQ;
     clearFindGuesses();
-    if (findQuiz.phase !== 'score') zoomReset();
-  }, [isFindMode, findQuiz.currentQ, findQuiz.phase, clearFindGuesses, zoomReset]);
-
-  // Zoom reset when entering find mode
-  useEffect(() => {
-    if (isFindMode) zoomReset();
-  }, [isFindMode, zoomReset]);
+  }, [isFindMode, findQuiz.currentQ, clearFindGuesses]);
 
   // Clear find markers when find round ends
   useEffect(() => {

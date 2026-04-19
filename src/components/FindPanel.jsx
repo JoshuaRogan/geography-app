@@ -52,6 +52,7 @@ export function FindPanel({
   const target = q ? db[q.targetId] : null;
   const hint = q && cfg.hintFn ? cfg.hintFn(q.targetId) : '';
   const wrongGuess = lastGuess && !lastGuess.correct;
+  const guessedName = wrongGuess ? (db[lastGuess.featureId]?.name || lastGuess.featureId) : '';
 
   return (
     <div id="game-panel">
@@ -77,6 +78,7 @@ export function FindPanel({
           </div>
         ) : wrongGuess ? (
           <div className="find-result find-result-miss">
+            <div className="find-result-guess">That's {guessedName}</div>
             <div className="find-result-heat" style={{ color: lastGuess.color }}>
               {lastGuess.emoji} {lastGuess.label}
             </div>
